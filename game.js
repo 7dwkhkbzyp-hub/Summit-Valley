@@ -928,5 +928,84 @@ app.on("update",dt=>{
  });
 });
 
+
+/* ============================================================
+   SUMMIT VALLEY — TYCOON SIMULATION PASS
+   Core loop inspired by the genre: freeform trail planning,
+   lift capacity, guest demand, weather/snow, staff and economy.
+   ============================================================ */
+const SV={
+  seasonDay:1, seasonLength:120, ticketPrice:72, liftRevenue:0,
+  trailRevenue:0, foodRevenue:0, snowDepth:1.0, baseSnow:1.0,
+  reputation:62, guestTarget:180, guestsActive:[],
+  staff:{patrol:2,groomers:1,snowmakers:1},
+  facilities:{lodging:0,food:0,retail:0},
+  liftStats:[], trailStats:[],
+  simTime:0
+};
+function svFacilityCounts(){
+  SV.facilities={lodging:0,food:0,retail:0};
+  placedBuildings.forEach(b=>{
+    if(["hotel","chalet","lodge"].includes(b.type))SV.facilities.lodging++;
+    if(["restaurant","bar","cafe"].includes(b.type))SV.facilities.food++;
+    if(["skiShop","rental"].includes(b.type))SV.facilities.retail++;
+  });
+}
+function svGuestCapacity(){return 70+SV.facilities.lodging*55+SV.facilities.food*28+SV.facilities.retail*18;}
+function svUpdateEconomy(dt){
+  svFacilityCounts();
+  const capacity=svGuestCapacity();
+  const weatherPenalty=weather===2?.58:weather===1?.84:1;
+  const snowFactor=Math.max(.45,Math.min(1.15,SV.snowDepth));
+  const desired=Math.round((SV.guestTarget+SV.facilities.lodging*22)*weatherPenalty*snowFactor);
+  const target=Math.min(capacity,Math.max(35,desired));
+  const change=(target-SV.guestsActive.length)*Math.min(1,dt*.45);
+  const count=Math.max(0,Math.round(SV.guestsActive.length+change));
+  while(SV.guestsActive.length<count)SV.guestsActive.push(svNewGuest(SV.guestsActive.length));
+  while(SV.guestsActive.length>count)SV.guestsActive.pop();
+  const spendPerGuest=(SV.facilities.food?1.35:.62)+(SV.facilities.retail?.42:0);
+  const ticketIncome=Math.max(0,count)*SV.ticketPrice/120;
+  const guestSpend=count*spendPerGuest/120;
+  const wages=(SV.staff.patrol*18+SV.staff.groomers*22+SV.staff.snowmakers*24)/120;
+  cash+=dt*(ticketIncome+guestSpend-wages);
+  SV.reputation=Math.max(1,Math.min(100,SV.reputation+dt*((weatherPenalty<.7?-0.08:.035)+(SV.facilities.food?.012:0))));
+  document.getElementById("guests").textContent=Math.round(count);
+  document.getElementById("reputation").textContent=Math.round(SV.reputation);
+}
+function svNewGuest(i){
+  const p=paths[i%Math.max(1,paths.length)];
+  const start=p?.pts?.[0]||[-10,-10];
+  return {id:i,type:["Powderhound","Family","Après","Expert"][i%4],x:start[0],z:start[1],pathIndex:i%Math.max(1,paths.length),t:Math.random(),speed:.018+Math.random()*.018,spent:0};
+}
+function svAnimateGuests(dt){
+  SV.guestsActive.forEach(g=>{
+    const p=paths[g.pathIndex%paths.length]; if(!p||p.pts.length<2)return;
+    g.t+=g.speed*dt*(weather===2?.55:1);
+    if(g.t>1){g.t=0;g.pathIndex=(g.pathIndex+1)%paths.length;}
+    const f=g.t*(p.pts.length-1),i=Math.min(p.pts.length-2,Math.floor(f)),q=f-i;
+    const a=p.pts[i],b=p.pts[i+1]; g.x=a[0]+(b[0]-a[0])*q;g.z=a[1]+(b[1]-a[1])*q;
+  });
+}
+function svSnowSim(dt){
+  const snowfall=weather===1?.020:weather===2?.009:0;
+  const melt=weather===0?.003:weather===2?.001:0;
+  SV.snowDepth=Math.max(.35,Math.min(2.5,SV.snowDepth+dt*(snowfall-melt)));
+  if(SV.snowDepth<.62 && SV.staff.snowmakers>0)SV.snowDepth=Math.min(2.5,SV.snowDepth+dt*.006*SV.staff.snowmakers);
+}
+function svBuildStats(){
+  SV.liftStats=[];
+  SV.trailStats=paths.map(p=>({name:p.name,grade:p.color===green?"Green":p.color===blue?"Blue":p.color===red?"Red":"Black",condition:Math.round(Math.min(100,58+SV.snowDepth*25))}));
+}
+function svSeason(dt){
+  SV.simTime+=dt; SV.seasonDay=1+Math.floor(SV.simTime/35);
+  if(SV.seasonDay>SV.seasonLength){SV.seasonDay=1;SV.simTime=0;toast("New ski season — weather reset");}
+  const dayEl=document.getElementById("gameTime");
+  if(dayEl)dayEl.textContent="Day "+SV.seasonDay+" · "+String(9+Math.floor((SV.simTime%35)/8)).padStart(2,"0")+":00";
+}
+app.on("update",dt=>{
+  if(typeof paused!=="undefined"&&paused)return;
+  svSeason(dt);svSnowSim(dt);svAnimateGuests(dt);svUpdateEconomy(dt);svBuildStats();
+});
+
 window.addEventListener("resize",()=>app.resizeCanvas(canvas.clientWidth,canvas.clientHeight));
 setTimeout(()=>{bootFinished=true;clearTimeout(bootWatchdog);const loading=document.getElementById("loading");if(loading){loading.style.opacity="0";setTimeout(()=>loading.remove(),450)}toast("Summit Valley — Alpine resort ready")},900);
