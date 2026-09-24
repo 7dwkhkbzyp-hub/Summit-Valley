@@ -222,6 +222,8 @@ func _render_piste(d: Dictionary) -> void:
     st.set_material(_mat(col,0.24))
     for i in range(pts.size()-1):
         var a=pts[i]; var b=pts[i+1]
+        a.y=terrain_height(a.x,a.z)+0.32
+        b.y=terrain_height(b.x,b.z)+0.32
         var side=(b-a).cross(Vector3.UP).normalized()
         var w=4.9 if d["difficulty"] != "BLACK" else 4.2
         st.add_vertex(a+side*w); st.add_vertex(b+side*w); st.add_vertex(a-side*w)
@@ -382,7 +384,8 @@ func _spawn_guest(i:int)->void:
         "phase":rng.randf_range(0.0,TAU),
         "state":"ski",
         "lift":-1,
-        "carrier":null
+        "carrier":null,
+        "queue_slot":0
     }
     guests.append(g)
     guest_root.add_child(n)
@@ -407,7 +410,7 @@ func _nearest_carrier_at_bottom(lift_index:int)->Node3D:
         if bool(c.get_meta("has_rider")): continue
         var t=float(c.get_meta("lift_t"))
         var dist:=min(t,1.0-t)
-        if t<0.12 and dist<best_dist:
+        if t<0.22 and dist<best_dist:
             best=c
             best_dist=dist
     return best
@@ -444,6 +447,11 @@ func _animate_guests(dt:float)->void:
                     g["lift"]=li
                     g["state"]="queue"
                     g["carrier"]=null
+                    var slot:=0
+                    for other in guests:
+                        if other != g and other.get("state","")=="queue" and int(other.get("lift",-1))==li:
+                            slot+=1
+                    g["queue_slot"]=slot
                     n.rotation_degrees=Vector3.ZERO
                 else:
                     g["t"]=0.0
@@ -471,7 +479,7 @@ func _animate_guests(dt:float)->void:
                 continue
             var d:Dictionary=lifts[li]
             var bottom:Vector3=d["a"]
-            var q_index:=int(abs(g["phase"])*10.0)%5
+            var q_index:=int(g.get("queue_slot",0))
             var span:Vector3=(d["b"]-d["a"]).normalized()
             var side:Vector3=span.cross(Vector3.UP).normalized()
             n.position=bottom+side*((q_index-2)*1.7)+Vector3(0,0.8,4.5)
@@ -481,6 +489,7 @@ func _animate_guests(dt:float)->void:
                 g["carrier"]=carrier
                 g["state"]="lift"
                 carrier.set_meta("has_rider",true)
+                g["queue_slot"]=0
 
         elif g["state"]=="lift":
             var carrier:Node3D=g["carrier"]
@@ -506,6 +515,23 @@ func _animate_guests(dt:float)->void:
                     g["state"]="ski"
                     g["t"]=0.0
                     g["carrier"]=null
+
+func _animate_lifts(dt:float)->void:
+    # Move every chair/cabin along the exact cable path used to place it.
+    for d in lifts:
+        var carriers:Array=d["carriers"]
+        var speed_base:=0.0105 if str(d["type"]).find("GONDOLA")<0 else 0.0085
+        for carrier in carriers:
+            if not is_instance_valid(carrier):
+                continue
+            var t:=float(carrier.get_meta("lift_t"))
+            var run:=float(carrier.get_meta("lift_run"))
+            var speed:=float(carrier.get_meta("lift_speed",speed_base))
+            t+=speed*dt
+            if t>1.0:
+                t-=1.0
+            carrier.set_meta("lift_t",t)
+            carrier.position=_lift_cable_position(d,t,run)
 
 func _economy_tick()->void:
     var open_pistes:=0
