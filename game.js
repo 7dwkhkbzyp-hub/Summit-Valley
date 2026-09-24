@@ -7,6 +7,7 @@ app.scene.ambientLight=new pc.Color(.30,.39,.52);app.scene.fog.type=pc.FOG_LINEA
 const sun=new pc.Entity("Alpine Sun");sun.addComponent("light",{type:"directional",color:new pc.Color(1,.94,.82),intensity:3,castShadows:true,shadowDistance:220,shadowResolution:2048});sun.setEulerAngles(43,-34,0);app.root.addChild(sun);app.scene.exposure=1.12;app.start();
 
 const mats={};function mat(n,c,r=.8,m=0,em=0){const x=new pc.StandardMaterial();x.diffuse=new pc.Color(c[0],c[1],c[2]);x.roughness=r;x.metalness=m;x.useMetalness=true;x.name=n;if(em){x.emissive=new pc.Color(c[0]*em,c[1]*em,c[2]*em);x.emissiveIntensity=em}x.update();mats[n]=x;return x}
+const rubber=mat("Lift rubber",[.045,.055,.06],.9);
 const snow=mat("Powder snow",[.82,.89,.96],.98),snowBright=mat("Sunlit snow",[.98,.995,1],.92),snowBlue=mat("Blue shadow snow",[.58,.70,.84],1),snowGrey=mat("Packed snow",[.70,.79,.88],.98),rock=mat("Dark granite",[.18,.20,.22],.96),rockLight=mat("Sunlit granite",[.36,.38,.39],.9),rockDark=mat("Deep rock",[.105,.12,.13],1),pine=mat("Fir forest",[.018,.095,.058],.98),pine2=mat("Snowy fir",[.10,.23,.16],.94),pineSnow=mat("Heavy snow fir",[.63,.72,.77],.96),trunk=mat("Timber",[.18,.09,.045],.9),timber=mat("Chalet timber",[.30,.15,.07],.82),roof=mat("Dark roof",[.055,.045,.043],.7),roofSnow=mat("Roof snow",[.88,.93,.97],.96),glass=mat("Warm glass",[.045,.18,.24],.10,.25,.35),warm=mat("Interior light",[1,.45,.08],.16,0,.9),steel=mat("Lift steel",[.29,.33,.37],.32,.85),cable=mat("Lift cable",[.025,.03,.035],.52,.8),chair=mat("Chair red",[.70,.045,.035],.4,.3),gondola=mat("Gondola blue",[.055,.23,.31],.15,.55),green=mat("Green piste",[.08,.52,.16],.78),blue=mat("Blue piste",[.045,.27,.76],.78),red=mat("Red piste",[.70,.055,.035],.72),black=mat("Black piste",[.035,.038,.045],.65),yellow=mat("Piste marker",[1,.65,.05],.45),jacket=mat("Skier blue",[.06,.22,.72],.66),jacket2=mat("Skier red",[.72,.06,.045],.66),jacket3=mat("Skier green",[.04,.38,.20],.66),jacket4=mat("Skier orange",[.90,.34,.04],.66),pants=mat("Skier dark",[.025,.035,.05],.72),skin=mat("Skin",[.70,.43,.27],.82),board=mat("Snowboard",[.07,.08,.10],.45,.4),goggle=mat("Goggles",[.03,.12,.18],.08,.55,.22),boot=mat("Boots",[.035,.045,.055],.48,.25),pack=mat("Backpack",[.035,.055,.075],.7),glove=mat("Gloves",[.055,.065,.075],.72),terrainTint=mat("Terrain detail",[.92,.96,1],.98);
 
 function entity(n,p,s,pos,m,parent=app.root){const e=new pc.Entity(n);e.addComponent("render",{type:p});e.setLocalScale(s[0],s[1],s[2]);e.setLocalPosition(pos[0],pos[1],pos[2]);e.render.material=m;parent.addChild(e);return e}
@@ -91,6 +92,7 @@ paths.forEach(path=>{path.pts.forEach(([x,z],i)=>{const prev=path.pts[Math.max(0
 
 function ribbon(path){const verts=[],inds=[],normals=[];for(let i=0;i<path.pts.length;i++){const[x,z]=path.pts[i],prev=path.pts[Math.max(0,i-1)],next=path.pts[Math.min(path.pts.length-1,i+1)],dx=next[0]-prev[0],dz=next[1]-prev[1],l=Math.hypot(dx,dz)||1,nx=-dz/l,nz=dx/l,w=path.width/2,left=[x+nx*w,z+nz*w],right=[x-nx*w,z-nz*w];verts.push(left[0],height(left[0],left[1])+.18,left[1],right[0],height(right[0],right[1])+.18,right[1]);normals.push(0,1,0,0,1,0)}for(let i=0;i<path.pts.length-1;i++){const q=i*2;inds.push(q,q+1,q+2,q+1,q+3,q+2)}meshEntity(path.name+" groomed piste",verts,inds,path.color,normals);path.pts.forEach(([x,z],i)=>{if(i%2===0){const dx=path.pts[Math.min(path.pts.length-1,i+1)][0]-path.pts[Math.max(0,i-1)][0],dz=path.pts[Math.min(path.pts.length-1,i+1)][1]-path.pts[Math.max(0,i-1)][1],l=Math.hypot(dx,dz)||1,nx=-dz/l,nz=dx/l;for(const s of[-1,1]){const px=x+nx*(path.width*.64)*s,pz=z+nz*(path.width*.64)*s;cyl(path.name+" marker pole",[.045,1.25,.045],[px,height(px,pz)+.62,pz],yellow)}}})}
 paths.forEach(ribbon);
+if(snowFx&&snowFx.particlesystem)snowFx.particlesystem.enabled=weather!==0;
 
 function signAt(text,x,z,color){const y=height(x,z)+1.2,e=new pc.Entity(text);e.setLocalPosition(x,y,z);app.root.addChild(e);cyl("sign post",[.06,1.3,.06],[0,-.65,0],steel,e);box("sign board",[1.55,.62,.1],[0,.05,0],color,e)}
 signAt("MEADOW",-18,1,green);signAt("RIDGE",12,1,red);signAt("GLACIER",18,4,blue);signAt("COULOIR",29,4,black);
@@ -100,7 +102,206 @@ chalet("Summit Lodge",-5,-24,1.35);chalet("Piste House",18,-16,.9);chalet("Mount
 
 function station(n,x,z,type="chair"){const y=height(x,z),e=new pc.Entity(n);e.setLocalPosition(x,y,z);app.root.addChild(e);box("station body",[6,2.8,4.5],[0,1.4,0],steel,e);const r1=box("station roof",[3.6,.5,5.6],[-1.5,3.05,0],roof,e);r1.setLocalEulerAngles(0,0,-22);const r2=box("station roof",[3.6,.5,5.6],[1.5,3.05,0],roof,e);r2.setLocalEulerAngles(0,0,22);box("station glass",[4.4,1.25,.12],[0,1.55,2.28],glass,e);box("station platform",[7,.25,1.3],[0,.25,0],snowBright,e);if(type==="gondola")box("gondola sign",[2.3,.55,.12],[0,2.35,2.4],gondola,e)}
 function makeLift(n,a,b,count,type="chair"){const root=new pc.Entity(n);app.root.addChild(root);const[ax,az]=a,[bx,bz]=b,dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz)||1,ay=height(ax,az)+3.1,by=height(bx,bz)+3.1,ang=Math.atan2(dx,dz)*180/Math.PI;station(n+" base",ax,az,type);station(n+" summit",bx,bz,type);for(let i=1;i<9;i++){const t=i/9,x=ax+dx*t,z=az+dz*t,y=height(x,z)+2.7,tower=new pc.Entity(n+" tower");tower.setLocalPosition(x,y,z);root.addChild(tower);cyl("tower leg",[.24,5,.24],[0,-2.5,0],steel,tower);box("crossarm",[3.2,.2,.35],[0,0,0],steel,tower);for(const sx of[-1,1])sphere("sheave",[.28,.28,.28],[sx*1.35,-.18,0],cable,tower)}const rope=box("haul cable",[.065,.065,len],[(ax+bx)/2,(ay+by)/2,(az+bz)/2],cable,root);rope.setLocalEulerAngles(0,ang,Math.atan2(by-ay,len)*180/Math.PI);const carriers=[];for(let i=0;i<count;i++){const e=new pc.Entity(n+" carrier "+i);root.addChild(e);e._phase=i/count;e._a=[ax,ay,az];e._b=[bx,by,bz];if(type==="gondola"){box("cabin",[1.25,1.05,.9],[0,-.2,0],gondola,e);box("cabin glass",[1,.65,.08],[0,-.15,.47],glass,e);box("hanger",[.07,1.35,.07],[0,.82,0],steel,e)}else{box("seat",[1.3,.16,.48],[0,-.58,0],chair,e);box("back",[1.3,.7,.11],[0,-.18,0],chair,e);box("hanger",[.07,1.5,.07],[0,.6,0],steel,e)}carriers.push(e)}return carriers}
+
+function makeSurfaceLift(n,a,b,type="tbar"){
+ const root=new pc.Entity(n);app.root.addChild(root);
+ const [ax,az]=a,[bx,bz]=b,dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz)||1;
+ station(n+" base",ax,az,"surface");station(n+" summit",bx,bz,"surface");
+ const count=Math.max(4,Math.floor(len/7));
+ for(let i=1;i<9;i++){
+  const t=i/9,x=ax+dx*t,z=az+dz*t,y=height(x,z)+1.6,tower=new pc.Entity(n+" surface tower");
+  tower.setLocalPosition(x,y,z);root.addChild(tower);
+  cyl("surface support",[.18,3.2,.18],[0,-1.6,0],steel,tower);
+  box("surface crossbar",[2.2,.14,.22],[0,.05,0],steel,tower);
+ }
+ const rope=box("surface haul rope",[.055,.055,len],[(ax+bx)/2,(height(ax,az)+height(bx,bz))/2+1.7,(az+bz)/2],cable,root);
+ rope.setLocalEulerAngles(0,Math.atan2(dx,dz)*180/Math.PI,Math.atan2(height(bx,bz)-height(ax,az),len)*180/Math.PI);
+ if(type==="magic"){
+  for(let i=0;i<Math.max(5,Math.floor(len/4));i++){
+   const t=(i+.5)/Math.max(5,Math.floor(len/4)),x=ax+dx*t,z=az+dz*t,y=height(x,z)+.5;
+   box("magic carpet pad",[1.6,.08,1.1],[x,y,z],rubber||roof,root);
+  }
+ }else{
+  for(let i=0;i<count;i++){
+   const t=(i+.5)/count,x=ax+dx*t,z=az+dz*t,y=height(x,z)+1.0;
+   const carrier=new pc.Entity(n+" tow carrier");carrier.setPosition(x,y,z);root.addChild(carrier);
+   cyl("T-bar hanger",[.05,.8,.05],[0,.35,0],steel,carrier);
+   box("T-bar",type==="tbar"?[1.0,.10,.12]:[.65,.08,.10],[0,-.08,0],chair,carrier);
+  }
+ }
+ return root;
+}
+
 const lift1=makeLift("Eagle Express",[-5,-22],[-39,33],12,"chair"),lift2=makeLift("Glacier Chair",[18,-15],[0,40],11,"chair"),lift3=makeLift("Ridge Gondola",[29,-8],[45,30],9,"gondola");
+
+
+
+/* =========================
+   HIGH DETAIL ALPINE WORLD
+   ========================= */
+
+function detailedRock(x,z,s=1,rot=0){
+ const y=height(x,z)+.05,e=new pc.Entity("Granite outcrop");
+ e.setLocalPosition(x,y,z);e.setEulerAngles(0,rot,0);e.setLocalScale(s,s,s);app.root.addChild(e);
+ // Faceted rock made from several irregular volumes; intentionally asymmetrical.
+ for(let i=0;i<4;i++){
+  const a=i*Math.PI/2+.4,rad=.55+.22*Math.sin(i*2.7+rot);
+  const r=cone("granite face",[.9+rad,.9+Math.sin(i+1)*.28+.9,.8+rad],[Math.cos(a)*.65, .45+i*.18, Math.sin(a)*.65],i%2?rock:rockLight,e);
+  r.setEulerAngles((i*13)%27,(i*37)%360,(i*9)%18);
+ }
+}
+
+function snowFence(x,z,rot=0,len=6){
+ const y=height(x,z),e=new pc.Entity("Avalanche snow fence");
+ e.setLocalPosition(x,y,z);e.setEulerAngles(0,rot,0);app.root.addChild(e);
+ for(let i=-2;i<=2;i++){
+  cyl("fence post",[.08,1.8,.08],[i*(len/5),.9,0],trunk,e);
+ }
+ box("fence top rail",[len,.09,.09],[0,1.72,0],trunk,e);
+ box("fence lower rail",[len,.07,.07],[0,.72,0],trunk,e);
+ for(let i=-4;i<=4;i++)box("fence slat",[.055,1.15,.045],[i*(len/8),1.18,0],snowGrey,e);
+}
+
+function pisteGrooming(path){
+ const marks=[];
+ for(let i=0;i<path.pts.length-1;i++){
+  const [x0,z0]=path.pts[i],[x1,z1]=path.pts[i+1];
+  const dx=x1-x0,dz=z1-z0,l=Math.hypot(dx,dz)||1,nx=-dz/l,nz=dx/l;
+  const steps=Math.max(2,Math.floor(l/2.5));
+  for(let j=1;j<steps;j++){
+   const t=j/steps,x=x0+dx*t,z=z0+dz*t;
+   // Groomer corduroy: a subtle set of raised snow ridges across the piste.
+   const e=new pc.Entity("Piste grooming");
+   e.setLocalPosition(x,height(x,z)+.205,z);
+   e.setEulerAngles(0,Math.atan2(dx,dz),0);
+   app.root.addChild(e);
+   for(let k=-2;k<=2;k++){
+    box("groomed rib",[path.width*.16,.025,.16],[k*(path.width*.17),0,0],snowBright,e);
+   }
+   marks.push(e);
+  }
+ }
+ return marks;
+}
+paths.forEach(p=>pisteGrooming(p));
+
+function pisteSign(text,x,z,material){
+ const y=height(x,z),e=new pc.Entity("Piste direction sign");
+ e.setLocalPosition(x,y,z);app.root.addChild(e);
+ cyl("signpost",[.055,2.25,.055],[0,1.12,0],steel,e);
+ box("sign panel",[2.5,.72,.12],[0,2.1,0],material,e);
+ box("sign white stripe",[2.1,.08,.05],[0,2.1,.08],snowBright,e);
+}
+pisteSign("GREEN",-28,-7,green);
+pisteSign("BLUE",17,-4,blue);
+pisteSign("RED",25,2,red);
+pisteSign("BLACK",35,9,black);
+
+function snowmakingGun(x,z,rot=0){
+ const y=height(x,z),e=new pc.Entity("Snowmaking cannon");
+ e.setLocalPosition(x,y,z);e.setEulerAngles(0,rot,0);app.root.addChild(e);
+ cyl("cannon tripod",[.12,.9,.12],[0,.45,0],steel,e);
+ for(const a of[0,120,240]){
+  const q=a*Math.PI/180;
+  box("tripod leg",[.07,.7,.07],[Math.cos(q)*.35,.28,Math.sin(q)*.35],steel,e);
+ }
+ const barrel=cyl("snow cannon barrel",[.23,1.35,.23],[0,1.05,0],steel,e);
+ barrel.setLocalEulerAngles(-12,0,0);
+ sphere("snow fan",[.32,.32,.32],[0,1.72,.18],snowBright,e);
+ box("control box",[.42,.55,.30],[.48,.35,.05],yellow,e);
+}
+[
+ [-22,-5,25],[6,-12,-18],[27,8,10],[-8,17,160],
+ [35,-2,-25],[-39,13,145],[-4,-28,0]
+].forEach(v=>snowmakingGun(...v));
+
+function villageBuilding(type,x,z,s=1,rot=0){
+ const e=createDetailedBuilding(type,x,z,false);e.setLocalScale(s,s,s);e.setEulerAngles(0,rot,0);return e;
+}
+
+// A lived-in alpine village: multiple façades, terraces and service buildings.
+// These are part of the world from the start, not just examples in the build menu.
+[
+ ["hotel",-42,-20,1.05,-8],
+ ["chalet",-31,-25,.72,12],
+ ["chalet",-20,-27,.68,-18],
+ ["restaurant",-8,-30,.82,2],
+ ["bar",5,-31,.75,-10],
+ ["cafe",17,-29,.68,15],
+ ["skiShop",28,-25,.72,-8],
+ ["rental",38,-20,.76,12],
+ ["ticket",-47,-8,.62,0],
+ ["toilet",-38,-6,.52,25]
+].forEach(v=>villageBuilding(...v));
+
+// Stone retaining walls and a village road give the lower resort a believable settlement footprint.
+function retainingWall(x,z,len,rot=0){
+ const y=height(x,z),e=new pc.Entity("Stone retaining wall");e.setLocalPosition(x,y,z);e.setEulerAngles(0,rot,0);app.root.addChild(e);
+ for(let i=0;i<Math.max(3,Math.floor(len/1.7));i++){
+  const xx=-len/2+i*(len/(Math.max(3,Math.floor(len/1.7))-1));
+  box("masonry block",[1.55,.7,.62],[xx,.35,0],i%3===0?rockLight:rock,e);
+ }
+}
+retainingWall(-28,-17,18,8);retainingWall(13,-21,16,-15);
+
+function villageRoad(x,z,len,rot=0){
+ const y=height(x,z)+.05,e=new pc.Entity("Snow covered village road");
+ e.setLocalPosition(x,y,z);e.setEulerAngles(0,rot,0);app.root.addChild(e);
+ box("road surface",[len,.08,3.8],[0,0,0],snowGrey,e);
+ for(let i=-Math.floor(len/3);i<=Math.floor(len/3);i++){
+  box("ploughed edge",[.08,.05,3.9],[i*3,.05,0],snowBright,e);
+ }
+}
+villageRoad(-20,-21,55,-6);villageRoad(18,-27,46,7);
+
+for(const r of[
+ [-54,22,.9,15],[-49,31,.75,42],[-38,35,1.1,-20],[-25,39,.8,18],
+ [-15,45,1.2,5],[12,39,.95,32],[29,32,.85,-15],[48,25,1.0,22],
+ [54,13,.72,45],[-57,5,.9,-12],[45,-4,.85,30],[-48,-1,.7,12]
+])detailedRock(...r);
+
+snowFence(-31,27,12,9);snowFence(3,35,-24,8);snowFence(42,17,25,7);
+snowFence(-2,24,76,6);
+
+function liftWarningGate(x,z,rot=0){
+ const y=height(x,z),e=new pc.Entity("Lift warning gate");e.setLocalPosition(x,y,z);e.setEulerAngles(0,rot,0);app.root.addChild(e);
+ for(const sx of[-1,1])cyl("gate post",[.09,2.5,.09],[sx*1.35,1.25,0],steel,e);
+ box("gate arm",[3,.12,.12],[0,2.25,0],yellow,e);
+ box("danger stripe",[3,.04,.16],[0,2.25,.08],red,e);
+}
+liftWarningGate(-7,-20,12);liftWarningGate(17,-14,-8);liftWarningGate(29,-7,25);
+
+function serviceCabin(x,z){
+ const y=height(x,z),e=new pc.Entity("Mountain operations cabin");e.setLocalPosition(x,y,z);app.root.addChild(e);
+ box("operations cabin",[4.2,2.7,3.4],[0,1.35,0],trunk,e);
+ box("operations roof",[4.8,.28,4],[0,2.85,0],roof,e);
+ box("operations snow cap",[4.9,.14,4.1],[0,3.05,0],roofSnow,e);
+ windowUnit(e,-1.1,1.7,1.76,1.1,.95);windowUnit(e,1.1,1.7,1.76,1.1,.95);
+ box("radio aerial",[.05,2,.05],[1.5,3.8,0],steel,e);
+}
+serviceCabin(-45,2);serviceCabin(41,3);
+
+// Optional snow particle effect. PlayCanvas supports GPU particle systems; keep it lightweight for iPhone Safari.
+let snowFx=null;
+try{
+ snowFx=new pc.Entity("Atmospheric snow");
+ snowFx.setLocalPosition(0,55,0);app.root.addChild(snowFx);
+ snowFx.addComponent("particlesystem",{
+   numParticles:220,
+   lifetime:8,
+   rate:.045,
+   rate2:.09,
+   emitterExtents:new pc.Vec3(75,18,60),
+   initialVelocity:0,
+   localVelocityGraph:new pc.CurveSet([[0,0],[.5,-1.2],[1,0]]),
+   scaleGraph:new pc.Curve([[0,.06],[.5,.12],[1,.02]]),
+   color:new pc.Color(1,1,1,0.82),
+   loop:true,
+   autoPlay:true,
+   lighting:false
+ });
+}catch(err){console.warn("Snow particles unavailable",err)}
+
 
 const guests=[];function samplePath(path,t){const f=t*(path.pts.length-1),i=Math.min(path.pts.length-2,Math.floor(f)),q=f-i;return[path.pts[i][0]+(path.pts[i+1][0]-path.pts[i][0])*q,path.pts[i][1]+(path.pts[i+1][1]-path.pts[i][1])*q]}
 function makeSkier(i,route,t,type){
@@ -343,7 +544,7 @@ function beginRoute(type,p){
  if(type==="piste"){const colour=buildSelection.id==="greenPiste"?green:buildSelection.id==="bluePiste"?blue:buildSelection.id==="redPiste"?red:black;
   const path={name:buildSelection.name+" "+(paths.length+1),color:colour,width:buildSelection.id==="blackPiste"?3.8:5.0,pts:[[a.x,a.z],[(a.x*2+b.x)/3,(a.z*2+b.z)/3],[b.x,b.z]]};
   paths.push(path);ribbon(path);toast(path.name+" built");
- }else{makeLift("Player "+buildSelection.name, [a.x,a.z],[b.x,b.z],buildSelection.id==="gondola"?8:8,buildSelection.id==="gondola"?"gondola":"chair");toast(buildSelection.name+" constructed")}
+ }else if(buildSelection.id==="chair"||buildSelection.id==="gondola"){makeLift("Player "+buildSelection.name,[a.x,a.z],[b.x,b.z],buildSelection.id==="gondola"?8:10,buildSelection.id==="gondola"?"gondola":"chair");toast(buildSelection.name+" constructed")}else{makeSurfaceLift("Player "+buildSelection.name",[a.x,a.z],[b.x,b.z],buildSelection.id);toast(buildSelection.name+" constructed")}
  buildStart=null;
 }
 
@@ -353,7 +554,7 @@ document.getElementById("closeBuild").onclick=()=>closeBuild();
 document.querySelectorAll("[data-menu]").forEach(b=>b.addEventListener("click",()=>{document.getElementById("mainMenu").classList.add("hidden");if(b.dataset.menu==="sandbox"){cash=9999999;toast("Sandbox mode — unlimited funds")}else if(b.dataset.menu==="continue"){loadGame()}else if(b.dataset.menu==="scenarios"){toast("Scenarios framework ready — first scenario coming soon")}else if(b.dataset.menu==="settings"){toast("Settings panel coming next")}else{cash=250000;toast("New season — build your resort")}}));
 function toast(t){const e=document.getElementById("toast");e.textContent=t;e.classList.add("show");clearTimeout(window.__toast);window.__toast=setTimeout(()=>e.classList.remove("show"),1600)}
 document.getElementById("pauseBtn").onclick=()=>{paused=!paused;document.getElementById("pauseBtn").textContent=paused?"▶":"Ⅱ";toast(paused?"Game paused":"Game resumed")};
-document.getElementById("weatherBtn").onclick=()=>{weather=(weather+1)%3;const n=["Clear","Snowfall","Storm"];document.getElementById("weather").textContent=n[weather];toast(n[weather]+" conditions")};
+document.getElementById("weatherBtn").onclick=()=>{weather=(weather+1)%3;const n=["Clear","Snowfall","Storm"];document.getElementById("weather").textContent=n[weather];if(snowFx)snowFx.particlesystem.enabled=weather!==0;if(snowFx&&snowFx.particlesystem)snowFx.particlesystem.rate=weather===1?.035:weather===2?.018:.001;app.scene.fog.end=weather===2?155:weather===1?205:250;toast(n[weather]+" conditions")};
 document.getElementById("resetBtn").onclick=()=>{placedBuildings.forEach(b=>b.entity&&b.entity.destroy());placedBuildings.length=0;cash=250000;localStorage.removeItem("summit-valley-save");toast("New season started")};
 window.addEventListener("beforeunload",saveGame);
 
