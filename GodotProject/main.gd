@@ -74,11 +74,17 @@ func _ready() -> void:
     add_child(building_root)
     add_child(guest_root)
     _setup_environment()
+    _build_ui()
+    _set_mode("SELECT")
+    _layout_ui()
+    # Build the world after the first web frame so Safari has a live scene
+    # before the procedural geometry is created.
+    call_deferred("_start_world")
+
+func _start_world() -> void:
     _build_mountain()
     _build_initial_resort()
     _spawn_guests(45)
-    _build_ui()
-    _set_mode("SELECT")
     _load_game()
     get_viewport().size_changed.connect(_layout_ui)
     _layout_ui()
