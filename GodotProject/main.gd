@@ -6,7 +6,7 @@ extends Node3D
 const MAP_SIZE := 180.0
 const GRID := 56
 const START_CASH := 250000.0
-const MAX_GUESTS := 180
+const MAX_GUESTS := 240
 const PISTE_COLOURS := {
     "GREEN": Color("#43d17b"),
     "BLUE": Color("#3f9cff"),
@@ -29,7 +29,7 @@ var season_days := 28
 var game_speed := 1.0
 var income_timer := 0.0
 var weather_timer := 0.0
-var save_key := "summit_valley_tycoon_v2"
+var save_key := "summit_valley_tycoon_v3"
 
 var camera: Camera3D
 var sun: DirectionalLight3D
@@ -82,7 +82,7 @@ func _ready() -> void:
     _setup_environment()
     _build_mountain()
     _build_initial_resort()
-    _spawn_guests(45)
+    _spawn_guests(60)
     _build_ui()
     _set_mode("SELECT")
     _load_game()
@@ -182,7 +182,7 @@ func _build_mountain() -> void:
     add_child(terrain_mesh)
 
     # Forest is concentrated in believable lower/mid-mountain bands.
-    for i in range(165):
+    for i in range(240):
         var x := rng.randf_range(-84.0,84.0)
         var z := rng.randf_range(-84.0,84.0)
         var y := terrain_height(x,z)
@@ -257,19 +257,17 @@ func _mountain_material()->StandardMaterial3D:
     m.cull_mode=BaseMaterial3D.CULL_BACK
     return m
 
+func _asset_mesh(path:String, scale:Vector3=Vector3.ONE)->MeshInstance3D:
+    var m:=MeshInstance3D.new()
+    var mesh=load(path)
+    if mesh is ArrayMesh:
+        m.mesh=mesh
+        m.scale=scale
+    return m
+
 func _detailed_pine()->Node3D:
     var root:=Node3D.new()
-    var trunk:=_cylinder(0.20,2.8,Color("#4b382c"))
-    trunk.position.y=1.4
-    root.add_child(trunk)
-    for layer in range(4):
-        var r:=2.4-float(layer)*0.42
-        var cone:=_cone(r,3.0,Color("#205445").lerp(Color("#2f7358"),float(layer)/4.0))
-        cone.position.y=2.1+float(layer)*1.55
-        root.add_child(cone)
-    var snow_cap:=_cone(1.7,1.0,Color("#eef5f7"))
-    snow_cap.position.y=7.0
-    root.add_child(snow_cap)
+    root.add_child(_asset_mesh("res://assets/pine/asset.obj",Vector3(0.72,0.72,0.72)))
     return root
 
 func _snowfield(radius:float)->Node3D:
@@ -473,12 +471,9 @@ func _lift(a:Vector3,b:Vector3,type_name:String)->void:
                 if is_gondola:
                     var hanger_bar:=_beam(Vector3(-0.8,-1.35,0),Vector3(0.8,-1.35,0),0.065,Color("#252a2e"))
                     carrier.add_child(hanger_bar)
-                    var cabin:=_box(Vector3(2.8,2.0,2.15),Color("#e3e8ea"))
-                    cabin.position.y=-2.65
+                    var cabin:=_asset_mesh("res://assets/gondola/asset.obj",Vector3(0.9,0.9,0.9))
+                    cabin.position.y=-2.35
                     carrier.add_child(cabin)
-                    var glass_front:=_box(Vector3(2.5,1.15,0.12),Color("#72b9d7"))
-                    glass_front.position=Vector3(0,-2.65,-1.11)
-                    carrier.add_child(glass_front)
                     var glass_back:=_box(Vector3(2.5,1.15,0.12),Color("#72b9d7"))
                     glass_back.position=Vector3(0,-2.65,1.11)
                     carrier.add_child(glass_back)
@@ -512,103 +507,10 @@ func _lift_cable_pos(data:Dictionary,t:float,run:float)->Vector3:
     return a.lerp(b,clamp(t,0.0,1.0))+side*run*2.0+Vector3.UP*(height-sin(clamp(t,0.0,1.0)*PI)*sag)
 
 func _cable_car_vehicle(carrier:Node3D)->void:
-    var hanger:=_beam(Vector3.ZERO,Vector3(0,-2.2,0),0.12,Color("#252a2e"))
-    carrier.add_child(hanger)
-    var roof:=_box(Vector3(4.8,0.35,3.0),Color("#343c42"))
-    roof.position=Vector3(0,-2.45,0)
-    carrier.add_child(roof)
-    var cabin:=_box(Vector3(4.4,2.9,2.7),Color("#dce4e7"))
-    cabin.position=Vector3(0,-3.95,0)
+    carrier.add_child(_beam(Vector3.ZERO,Vector3(0,-1.6,0),0.10,Color("#252a2e")))
+    var cabin:=_asset_mesh("res://assets/gondola/asset.obj",Vector3(0.95,0.95,0.95))
+    cabin.position.y=-2.0
     carrier.add_child(cabin)
-    var front:=_box(Vector3(3.9,1.8,0.12),Color("#69b8d4"))
-    front.position=Vector3(0,-3.9,-1.39)
-    carrier.add_child(front)
-    var rear:=_box(Vector3(3.9,1.8,0.12),Color("#69b8d4"))
-    rear.position=Vector3(0,-3.9,1.39)
-    carrier.add_child(rear)
-    for x in [-1.7,1.7]:
-        var window:=_box(Vector3(0.12,1.7,1.9),Color("#69b8d4"))
-        window.position=Vector3(x,-3.9,0)
-        carrier.add_child(window)
-    var door:=_box(Vector3(1.0,1.9,0.08),Color("#3d5964"))
-    door.position=Vector3(0,-3.9,-1.46)
-    carrier.add_child(door)
-    var bumper:=_box(Vector3(4.0,0.18,0.28),Color("#20262b"))
-    bumper.position=Vector3(0,-5.45,-1.35)
-    carrier.add_child(bumper)
-
-func _cable_tube(points:PackedVector3Array,radius:float,color:Color)->MeshInstance3D:
-    var st:=SurfaceTool.new()
-    st.begin(Mesh.PRIMITIVE_TRIANGLES)
-    st.set_material(_mat(color,0.32))
-    var sides:=8
-    for i in range(points.size()):
-        var p:=points[i]
-        var tangent:Vector3
-        if i==0:
-            tangent=(points[1]-points[0]).normalized()
-        elif i==points.size()-1:
-            tangent=(points[i]-points[i-1]).normalized()
-        else:
-            tangent=(points[i+1]-points[i-1]).normalized()
-        var normal:=tangent.cross(Vector3.UP)
-        if normal.length()<0.01:
-            normal=tangent.cross(Vector3.RIGHT)
-        normal=normal.normalized()
-        var binormal:=tangent.cross(normal).normalized()
-        for j in range(sides):
-            var ang=TAU*float(j)/float(sides)
-            st.add_vertex(p+(normal*cos(ang)+binormal*sin(ang))*radius)
-    for i in range(points.size()-1):
-        for j in range(sides):
-            var a=i*sides+j
-            var b=i*sides+((j+1)%sides)
-            var c2=(i+1)*sides+((j+1)%sides)
-            var d=(i+1)*sides+j
-            st.add_index(a);st.add_index(b);st.add_index(c2)
-            st.add_index(a);st.add_index(c2);st.add_index(d)
-    var mesh:=MeshInstance3D.new()
-    mesh.mesh=st.commit()
-    return mesh
-
-func _magic_carpet(a:Vector3,b:Vector3)->void:
-    var data={"a":a,"b":b,"type":"MAGIC CARPET","carriers":[]}
-    lifts.append(data)
-    var dir:=Vector3(b.x-a.x,0,b.z-a.z).normalized()
-    var side:=Vector3(-dir.z,0,dir.x)
-    var length:=a.distance_to(b)
-    # Belt surface, side rails and a weather canopy: a recognisable beginner-area carpet.
-    var belt:=_box(Vector3(3.8,0.18,length),Color("#1f2428"))
-    belt.position=(a+b)*0.5+Vector3.UP*0.22
-    belt.rotation.y=atan2(dir.x,dir.z)
-    lift_root.add_child(belt)
-    for s in [-1.0,1.0]:
-        var rail_a=a+side*s*2.1+Vector3.UP*0.8
-        var rail_b=b+side*s*2.1+Vector3.UP*0.8
-        lift_root.add_child(_beam(rail_a,rail_b,0.10,Color("#68747b")))
-        for i in range(5):
-            var t=float(i)/4.0
-            var p=a.lerp(b,t)+side*s*2.1+Vector3.UP*0.8
-            var post:=_beam(p-Vector3.UP*0.8,p,0.09,Color("#4d565d"))
-            lift_root.add_child(post)
-    # Four canopy frames and translucent roof panels.
-    for i in range(4):
-        var t=float(i)/3.0
-        var p=a.lerp(b,t)
-        var left=p-side*2.6
-        var right=p+side*2.6
-        lift_root.add_child(_beam(left+Vector3.UP*0.8,left+Vector3.UP*4.0,0.16,Color("#4d565d")))
-        lift_root.add_child(_beam(right+Vector3.UP*0.8,right+Vector3.UP*4.0,0.16,Color("#4d565d")))
-        var roof:=_box(Vector3(5.4,0.18,5.0),Color("#b7d7e4"))
-        roof.position=p+Vector3.UP*4.0
-        roof.rotation.y=atan2(dir.x,dir.z)
-        lift_root.add_child(roof)
-    var label:=Label3D.new()
-    label.text="MAGIC CARPET"
-    label.font_size=24
-    label.outline_size=7
-    label.position=(a+b)*0.5+Vector3.UP*5.2
-    lift_root.add_child(label)
 
 func _lift_station(pos:Vector3,side:String,type_name:String)->void:
     var root:=Node3D.new()
@@ -694,35 +596,7 @@ func _spawn_guest(i:int)->void:
 func _skier(i:int)->Node3D:
     var n:=Node3D.new()
     n.name="Skier_"+str(i)
-    var jackets=[Color("#d84b42"),Color("#397bc5"),Color("#e2a52f"),Color("#744db1"),Color("#24a578"),Color("#ed7834")]
-    var jacket=jackets[i%jackets.size()]
-    var body:=_box(Vector3(0.62,1.2,0.48),jacket)
-    body.name="Body"
-    body.position.y=1.12
-    n.add_child(body)
-    var head:=_sphere(0.39,Color("#efc5a5"))
-    head.position.y=2.02
-    n.add_child(head)
-    var helmet:=_sphere(0.44,Color("#20262b"))
-    helmet.scale=Vector3(1,0.64,1)
-    helmet.position.y=2.28
-    n.add_child(helmet)
-    var goggles:=_box(Vector3(0.43,0.13,0.10),Color("#73c8dc"))
-    goggles.position=Vector3(0,2.07,-0.34)
-    n.add_child(goggles)
-    var pants:=_box(Vector3(0.68,0.72,0.5),Color("#252b33"))
-    pants.position.y=0.42
-    n.add_child(pants)
-    for s in [-1.0,1.0]:
-        var ski:=_box(Vector3(0.10,0.07,2.15),Color("#f4f6f7"))
-        ski.position=Vector3(s*0.22,0.10,0)
-        n.add_child(ski)
-        var boot:=_box(Vector3(0.20,0.22,0.45),Color("#15191d"))
-        boot.position=Vector3(s*0.22,0.22,-0.18)
-        n.add_child(boot)
-        n.add_child(_beam(Vector3(s*0.38,1.05,-0.05),Vector3(s*0.50,0.05,-0.65),0.025,Color("#30363b")))
-    n.add_child(_beam(Vector3(-0.32,1.55,0),Vector3(-0.58,1.0,-0.15),0.09,jacket))
-    n.add_child(_beam(Vector3(0.32,1.55,0),Vector3(0.58,1.0,-0.15),0.09,jacket))
+    n.add_child(_asset_mesh("res://assets/skier/asset.obj",Vector3(1.15,1.15,1.15)))
     return n
 
 func _animate_guests(dt:float)->void:
@@ -1049,48 +923,14 @@ func _building(title:String,pos:Vector3,cost:float)->void:
     buildings.append({"name":title,"pos":pos,"cost":cost})
     var root:=Node3D.new()
     root.position=pos
-
-    var base:=_box(Vector3(12,6.5,9),Color("#76513e"))
-    base.position.y=3.25
-    root.add_child(base)
-    var upper:=_box(Vector3(10.5,2.5,8.0),Color("#b77b51"))
-    upper.position=Vector3(0,7.5,0)
-    root.add_child(upper)
-
-    # Deep alpine roof with overhang and snow layer.
-    var roof:=_box(Vector3(14.5,1.0,10.8),Color("#252c31"))
-    roof.position.y=9.2
-    roof.rotation.z=deg_to_rad(5.0)
-    root.add_child(roof)
-    var roof_snow:=_box(Vector3(14.8,0.38,11.1),Color("#eef4f6"))
-    roof_snow.position.y=9.75
-    roof_snow.rotation.z=deg_to_rad(5.0)
-    root.add_child(roof_snow)
-
-    for x in [-3.8,-1.3,1.3,3.8]:
-        var win:=_box(Vector3(1.35,1.55,0.16),Color("#ffd66e"))
-        win.position=Vector3(x,4.0,-4.58)
-        root.add_child(win)
-        var upper_win:=_box(Vector3(1.15,1.0,0.16),Color("#f6c96a"))
-        upper_win.position=Vector3(x,7.55,-4.1)
-        root.add_child(upper_win)
-
-    var door:=_box(Vector3(1.5,2.5,0.18),Color("#3b2a25"))
-    door.position=Vector3(0,1.35,-4.62)
-    root.add_child(door)
-
-    var chimney:=_box(Vector3(0.7,2.2,0.7),Color("#4c3d38"))
-    chimney.position=Vector3(3.1,10.5,1.0)
-    root.add_child(chimney)
-    var chimney_cap:=_box(Vector3(1.0,0.25,1.0),Color("#2f2927"))
-    chimney_cap.position=Vector3(3.1,11.7,1.0)
-    root.add_child(chimney_cap)
-
+    var variant:=buildings.size()%3
+    root.add_child(_asset_mesh("res://assets/chalet/asset.obj",Vector3(1.0+variant*0.05,1.0+variant*0.03,1.0+variant*0.05)))
     var sign:=Label3D.new()
     sign.text=title
     sign.font_size=24
     sign.outline_size=7
-    sign.position.y=12.5
+    sign.modulate=Color("#ffffff")
+    sign.position=Vector3(0,14.0,0)
     root.add_child(sign)
     building_root.add_child(root)
 
