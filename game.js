@@ -177,8 +177,8 @@ function worldPointFromScreen(clientX,clientY){
  const r=canvas.getBoundingClientRect();
  const sx=(clientX-r.left)*(canvas.width/r.width);
  const sy=(clientY-r.top)*(canvas.height/r.height);
- const near=camera.screenToWorld(sx,sy,0.01);
- const far=camera.screenToWorld(sx,sy,1000);
+ const near=camera.camera.screenToWorld(sx,sy,0.01);
+ const far=camera.camera.screenToWorld(sx,sy,1000);
  const ray=new pc.Vec3(far.x-near.x,far.y-near.y,far.z-near.z);
  let t=(18-near.y)/(ray.y||-0.001);
  if(t<0)t=1;
