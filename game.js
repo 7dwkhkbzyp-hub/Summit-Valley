@@ -198,7 +198,7 @@ function gableRoof(parent,w,d,h,overhang=1){
   -w/2,-h/2,d/2,  w/2,-h/2,d/2,  0,h/2,d/2
  ];
  const inds=[0,1,2,3,5,4,0,3,4,0,4,1,1,4,5,1,5,2,2,5,3,2,3,0];
- return meshEntity("architectural gable roof",verts,inds,roof);
+ const e=meshEntity("architectural gable roof",verts,inds,roof);root.addChild(e);e.setLocalPosition(0,0,0);return e;
 }
 function windowUnit(parent,x,y,z,w=1.15,h=1.25){
  box("deep window reveal",[w+.18,h+.18,.22],[x,y,z-.06],trunk,parent);
