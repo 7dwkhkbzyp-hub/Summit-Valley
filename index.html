@@ -1,12 +1,12 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="theme-color" content="#07131f"><link rel="manifest" href="manifest.json"><title>Summit Valley Ski Resort Tycoon</title>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="theme-color" content="#07131f"><link rel="manifest" href="manifest.json"><title>Summit Valley — Ski Resort Tycoon V3</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07131f;color:#fff;font-family:system-ui,-apple-system,sans-serif;touch-action:none}canvas{position:fixed;inset:0;width:100%;height:100%}.p{background:rgba(5,13,22,.78);border:1px solid #ffffff20;border-radius:14px;backdrop-filter:blur(12px);box-shadow:0 10px 30px #0006}#logo{position:fixed;top:12px;left:12px;padding:10px 14px;font-weight:900;letter-spacing:.15em}#logo b{color:#55d5ff}#stats{position:fixed;top:12px;right:12px;padding:8px 12px;display:flex;gap:16px;font-size:10px;color:#a8bac8}.s b{display:block;color:#fff;font-size:13px}#bar{position:fixed;bottom:12px;left:12px;right:12px;padding:7px;display:flex;gap:5px;flex-wrap:wrap}button{background:#142b40;color:#eef8ff;border:1px solid #ffffff14;border-radius:9px;padding:9px 11px;font-weight:800;font-size:11px}button.on{background:#087fae}#info{position:fixed;left:12px;top:62px;padding:10px;width:260px;font-size:11px;color:#aec0cf;line-height:1.4}#toast{position:fixed;top:82px;left:50%;transform:translateX(-50%);padding:10px 14px;opacity:0;transition:.2s;font-size:12px}
 @media(max-width:650px){#stats .s:nth-child(n+4){display:none}button{padding:10px 9px}}
 </style></head><body>
 <canvas id="c"></canvas><div id="logo" class="p">SUMMIT <b>VALLEY</b></div>
-<div id="stats" class="p"><div class="s">SNOW<b id="sn">92 cm</b></div><div class="s">GUESTS<b id="gu">60</b></div><div class="s">PISTES<b id="pi">5</b></div><div class="s">CASH<b id="ca">£24,800</b></div></div>
-<div id="info" class="p"><b>SUMMIT VALLEY — ALPINE SANDBOX</b><br>Rotate and zoom the mountain. Build pistes that physically follow the terrain, then build different lift systems to serve them. Watch guests queue, ride and ski the network.</div>
+<div id="stats" class="p"><div class="s">SNOW<b id="sn">92 cm</b></div><div class="s">GUESTS<b id="gu">60</b></div><div class="s">PISTES<b id="pi">5</b></div><div class="s">LIFTS<b id="lf">2</b></div><div class="s">REPUTATION<b id="rep">72%</b></div><div class="s">CASH<b id="ca">£24,800</b></div></div>
+<div id="info" class="p"><b>SUMMIT VALLEY — RESORT MANAGEMENT</b><br>Build the resort, not just the scenery. Guests ski, visit facilities, spend money and affect reputation. Build pistes and lifts, manage weather and grooming, then expand.</div>
 <div id="toast" class="p"></div>
 <div id="bar" class="p"><button id="sel" class="on">SELECT</button><button id="bp">BUILD PISTE</button><button id="bl">LIFTS</button><button id="chair">CHAIRLIFT</button><button id="gondola">GONDOLA</button><button id="magic">CARPET</button><button id="fin" style="display:none">FINISH</button><button id="gr">GROOM</button><button id="nw">SNOW</button><button id="su">SUN</button><button id="pa">PAUSE</button><button id="sp">1×</button></div>
 <script>
@@ -41,10 +41,10 @@ let pistes=[];function diff(p){let s=0;for(let i=1;i<p.length;i++)s+=Math.abs(p[
 let lifts=[
  {type:'chairlift',a:[-3,27],b:[-3,-20],phase:0,capacity:4,speed:1},
  {type:'gondola',a:[14,19],b:[14,-19],phase:2,capacity:8,speed:.75}
-],guests=[];for(let i=0;i<60;i++)guests.push({id:i,p:i%pistes.length,t:Math.random(),skill:Math.random()});
-let buildings=[[-2,27,7,4,4],[7,25,4,4,3],[13,27,4,4,3]],snow=.32,heat=.08,cash=24800,paused=false,spd=1,mode='select',drawPts=[],yaw=.65,pitch=.72,dist=68,drag=false,lx=0,ly=0;
+],guests=[];for(let i=0;i<60;i++)guests.push({id:i,p:i%pistes.length,t:Math.random(),skill:Math.random(),state:['ski','ski','ski','facility'][i%4],money:80+Math.random()*120,satisfaction:65+Math.random()*30});
+let buildings=[[-2,27,7,4,4],[7,25,4,4,3],[13,27,4,4,3],[20,18,3,3,3],[-16,20,3,3,3]],snow=.32,heat=.08,cash=24800,paused=false,spd=1,mode='select',drawPts=[],yaw=.65,pitch=.72,dist=68,drag=false,lx=0,ly=0,reputation=72;
 function toast(t){let e=document.getElementById('toast');e.textContent=t;e.style.opacity=1;clearTimeout(window.tt);window.tt=setTimeout(()=>e.style.opacity=0,1600)}
-function ui(){sn.textContent=Math.round(55+snow*125)+' cm';gu.textContent=guests.length;pi.textContent=pistes.length;ca.textContent='£'+Math.round(cash).toLocaleString()}
+function ui(){sn.textContent=Math.round(55+snow*125)+' cm';gu.textContent=guests.length;pi.textContent=pistes.length;lf.textContent=lifts.length;rep.textContent=Math.round(reputation)+'%';ca.textContent='£'+Math.round(cash).toLocaleString()}
 let liftType='chairlift';
 function setLiftType(t){liftType=t;mode='lift';drawPts=[];toast(t==='chairlift'?'Chairlift selected':t==='gondola'?'Gondola selected':'Magic carpet selected')}
 chair.onclick=()=>setLiftType('chairlift');gondola.onclick=()=>setLiftType('gondola');magic.onclick=()=>setLiftType('magic');
@@ -58,7 +58,7 @@ let last=performance.now();function frame(now){let dt=Math.min(.04,(now-last)/16
 for(let b of buildings){let x=b[0],z=b[1],y=H(x,z);draw(BOX,Mul(T(x,y+b[4]/2,z),Sc(b[2],b[4],b[3])));draw(BOX,Mul(T(x,y+b[4]+.4,z),Sc(b[2]*1.12,.55,b[3]*1.12)))}
 for(let l of lifts){
  let ax=l.a[0],az=l.a[1],bx=l.b[0],bz=l.b[1],dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz)||1;
- if(l.type!=='magic'){
+ if(l.type!=='magic'){for(let end of [0,1]){let x=end?bx:ax,z=end?bz:az,y=H(x,z);draw(BOX,Mul(T(x,y+1.1,z),Sc(1.8,.7,1.8)));draw(BOX,Mul(T(x,y+2,z),Sc(1.2,.15,1.2)));}
    for(let i=0;i<9;i++){let t=i/8,x=ax+dx*t,z=az+dz*t,y=H(x,z)+2.8;draw(BOX,Mul(T(x,y,z),Sc(l.type==='gondola'?.24:.18,2.8,l.type==='gondola'?.24:.18)))}
    // cable segments
    for(let i=0;i<22;i++){let t=i/21,x=ax+dx*t,z=az+dz*t,y=H(x,z)+3.9;draw(BOX,Mul(T(x,y,z),Sc(.035,.035,.035)))}
@@ -79,10 +79,10 @@ for(let q of drawPts)draw(BOX,Mul(T(q[0],H(q[0],q[1])+.8,q[1]),Sc(.3,.3,.3)));ui
 
 /* v0.2 additions: local sandbox save/load + PWA offline support */
 const saveBtn=document.createElement('button');saveBtn.textContent='SAVE';saveBtn.id='saveGame';
-const loadBtn=document.createElement('button');loadBtn.textContent='LOAD';loadBtn.id='loadGame';
-document.getElementById('bar').append(saveBtn,loadBtn);
-saveBtn.onclick=()=>{localStorage.setItem('summitValleySave',JSON.stringify({cash,snow,heat,pistes:pistes.map(p=>({p:p.p,t:p.t,condition:p.condition})),lifts,buildings}));toast('Resort saved on this iPhone')};
-loadBtn.onclick=()=>{let z=localStorage.getItem('summitValleySave');if(!z)return toast('No save found');try{let q=JSON.parse(z);cash=q.cash;snow=q.snow;heat=q.heat;pistes=q.pistes.map(p=>({...p,m:Ribbon(p.p,.85,PC[p.t])}));lifts=q.lifts;buildings=q.buildings;toast('Resort loaded');ui()}catch(e){toast('Save could not be loaded')}};
+const loadBtn=document.createElement('button');loadBtn.textContent='LOAD';loadBtn.id='loadGame';const manageBtn=document.createElement('button');manageBtn.textContent='RESORT';manageBtn.onclick=()=>toast('Reputation '+Math.round(reputation)+'% • '+guests.length+' guests • £'+Math.round(cash).toLocaleString());
+document.getElementById('bar').append(saveBtn,loadBtn,manageBtn);
+saveBtn.onclick=()=>{localStorage.setItem('summitValleySave',JSON.stringify({cash,snow,heat,reputation,pistes:pistes.map(p=>({p:p.p,t:p.t,condition:p.condition})),lifts,buildings}));toast('Resort saved on this iPhone')};
+loadBtn.onclick=()=>{let z=localStorage.getItem('summitValleySave');if(!z)return toast('No save found');try{let q=JSON.parse(z);cash=q.cash;snow=q.snow;heat=q.heat;reputation=q.reputation||72;pistes=q.pistes.map(p=>({...p,m:Ribbon(p.p,.85,PC[p.t])}));lifts=q.lifts;buildings=q.buildings;toast('Resort loaded');ui()}catch(e){toast('Save could not be loaded')}};
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
 
 </script></body></html>
