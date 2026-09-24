@@ -6,16 +6,24 @@
 </style></head><body>
 <canvas id="c"></canvas><div id="logo" class="p">SUMMIT <b>VALLEY</b></div>
 <div id="stats" class="p"><div class="s">SNOW<b id="sn">92 cm</b></div><div class="s">GUESTS<b id="gu">60</b></div><div class="s">PISTES<b id="pi">5</b></div><div class="s">CASH<b id="ca">£24,800</b></div></div>
-<div id="info" class="p">3D alpine sandbox · Drag to orbit · pinch to zoom. Build real piste corridors and chairlifts directly on the mountain.</div>
+<div id="info" class="p"><b>SUMMIT VALLEY — ALPINE SANDBOX</b><br>Rotate and zoom the mountain. Build pistes that physically follow the terrain, then build different lift systems to serve them. Watch guests queue, ride and ski the network.</div>
 <div id="toast" class="p"></div>
-<div id="bar" class="p"><button id="sel" class="on">SELECT</button><button id="bp">BUILD PISTE</button><button id="bl">BUILD LIFT</button><button id="fin" style="display:none">FINISH</button><button id="gr">GROOM</button><button id="nw">SNOW</button><button id="su">SUN</button><button id="pa">PAUSE</button><button id="sp">1×</button></div>
+<div id="bar" class="p"><button id="sel" class="on">SELECT</button><button id="bp">BUILD PISTE</button><button id="bl">LIFTS</button><button id="chair">CHAIRLIFT</button><button id="gondola">GONDOLA</button><button id="magic">CARPET</button><button id="fin" style="display:none">FINISH</button><button id="gr">GROOM</button><button id="nw">SNOW</button><button id="su">SUN</button><button id="pa">PAUSE</button><button id="sp">1×</button></div>
 <script>
 const c=document.getElementById('c'),g=c.getContext('webgl2',{antialias:true});if(!g){alert('This game needs WebGL2. Please use current Safari.')}
 let d=Math.min(devicePixelRatio||1,1.7);function rs(){c.width=innerWidth*d;c.height=innerHeight*d;g.viewport(0,0,c.width,c.height)}addEventListener('resize',rs);rs();
 const V=`#version 300 es
 in vec3 p,n,col;uniform mat4 P,V,M;out vec3 N,C,W;void main(){vec4 w=M*vec4(p,1.);W=w.xyz;N=mat3(M)*n;C=col;gl_Position=P*V*w;}`;
 const F=`#version 300 es
-precision highp float;in vec3 N,C,W;uniform vec3 sun;uniform float snow,heat;out vec4 o;void main(){float l=.32+.68*max(dot(normalize(N),normalize(sun)),0.);float h=clamp((W.y+2.)/30.,0.,1.);float cover=clamp(.08+h*.7+snow*.35-heat*.4,0.,1.);o=vec4(mix(C,vec3(.88,.95,1.),cover)*l,1.);}`;
+precision highp float;in vec3 N,C,W;uniform vec3 sun;uniform float snow,heat;out vec4 o;void main(){float l=.32+.68*max(dot(normalize(N),normalize(sun)),0.);float h=clamp((W.y+2.)/30.,0.,1.);float cover=clamp(.08+h*.7+snow*.35-heat*.4,0.,1.);
+float rock=1.-smoothstep(.68,.9,h);
+vec3 rockC=vec3(.24,.26,.27);
+vec3 snowC=vec3(.91,.96,1.0);
+vec3 c=mix(C,rockC,rock*.7);
+c=mix(c,snowC,cover);
+float ridge=sin(W.x*1.7+W.z*.9)*.035+sin(W.x*4.2-W.z*2.1)*.018;
+c+=ridge;
+o=vec4(c*l,1.);}`;
 function shader(t,s){let x=g.createShader(t);g.shaderSource(x,s);g.compileShader(x);return x}let pg=g.createProgram();g.attachShader(pg,shader(g.VERTEX_SHADER,V));g.attachShader(pg,shader(g.FRAGMENT_SHADER,F));g.linkProgram(pg);
 const L={p:g.getAttribLocation(pg,'p'),n:g.getAttribLocation(pg,'n'),c:g.getAttribLocation(pg,'col'),P:g.getUniformLocation(pg,'P'),V:g.getUniformLocation(pg,'V'),M:g.getUniformLocation(pg,'M'),sun:g.getUniformLocation(pg,'sun'),snow:g.getUniformLocation(pg,'snow'),heat:g.getUniformLocation(pg,'heat')};
 function I(){let m=new Float32Array(16);m[0]=m[5]=m[10]=m[15]=1;return m}function T(x,y,z){let m=I();m[12]=x;m[13]=y;m[14]=z;return m}function Sc(x,y,z){let m=I();m[0]=x;m[5]=y;m[10]=z;return m}function Ry(a){let m=I(),c=Math.cos(a),s=Math.sin(a);m[0]=c;m[2]=-s;m[8]=s;m[10]=c;return m}function Mul(a,b){let r=new Float32Array(16);for(let j=0;j<4;j++)for(let i=0;i<4;i++)r[j*4+i]=a[i]*b[j*4]+a[4+i]*b[j*4+1]+a[8+i]*b[j*4+2]+a[12+i]*b[j*4+3];return r}
@@ -30,17 +38,41 @@ const PC={green:[.05,.72,.34],blue:[.04,.35,.9],red:[.9,.07,.09],black:[.025,.03
 function Ribbon(p,w,col){let v=[];for(let i=0;i<p.length-1;i++){let a=p[i],b=p[i+1],dx=b[0]-a[0],dz=b[2]-a[2],l=Math.hypot(dx,dz)||1,nx=-dz/l,nz=dx/l;let pts=[[a[0]+nx*w,H(a[0]+nx*w,a[2]+nz*w)+.18,a[2]+nz*w],[b[0]+nx*w,H(b[0]+nx*w,b[2]+nz*w)+.18,b[2]+nz*w],[a[0]-nx*w,H(a[0]-nx*w,a[2]-nz*w)+.18,a[2]-nz*w],[b[0]-nx*w,H(b[0]-nx*w,b[2]-nz*w)+.18,b[2]-nz*w]];for(let q of [pts[0],pts[1],pts[2],pts[1],pts[3],pts[2]])v.push(q[0],q[1],q[2],0,1,0,...col)}return Mesh(v)}
 let pistes=[];function diff(p){let s=0;for(let i=1;i<p.length;i++)s+=Math.abs(p[i-1][1]-p[i][1])/(Math.hypot(p[i-1][0]-p[i][0],p[i-1][2]-p[i][2])||1);s/=p.length-1;return s<.18?'green':s<.3?'blue':s<.45?'red':'black'}function addPiste(p){let t=diff(p);pistes.push({p,t,m:Ribbon(p,.85,PC[t]),condition:100})}
 [[[-18,0,20],[-12,0,8],[-8,0,-10]],[[8,0,20],[5,0,7],[1,0,-12]],[[17,0,16],[13,0,5],[9,0,-15]],[[-2,0,25],[-1,0,10],[-4,0,-18]],[[22,0,4],[18,0,-5],[14,0,-22]]].forEach(a=>addPiste(a.map(q=>[q[0],H(q[0],q[2])+.35,q[2]])));
-let lifts=[{a:[-3,27],b:[-3,-20],phase:0},{a:[14,19],b:[14,-19],phase:2}],guests=[];for(let i=0;i<60;i++)guests.push({id:i,p:i%pistes.length,t:Math.random(),skill:Math.random()});
+let lifts=[
+ {type:'chairlift',a:[-3,27],b:[-3,-20],phase:0,capacity:4,speed:1},
+ {type:'gondola',a:[14,19],b:[14,-19],phase:2,capacity:8,speed:.75}
+],guests=[];for(let i=0;i<60;i++)guests.push({id:i,p:i%pistes.length,t:Math.random(),skill:Math.random()});
 let buildings=[[-2,27,7,4,4],[7,25,4,4,3],[13,27,4,4,3]],snow=.32,heat=.08,cash=24800,paused=false,spd=1,mode='select',drawPts=[],yaw=.65,pitch=.72,dist=68,drag=false,lx=0,ly=0;
 function toast(t){let e=document.getElementById('toast');e.textContent=t;e.style.opacity=1;clearTimeout(window.tt);window.tt=setTimeout(()=>e.style.opacity=0,1600)}
 function ui(){sn.textContent=Math.round(55+snow*125)+' cm';gu.textContent=guests.length;pi.textContent=pistes.length;ca.textContent='£'+Math.round(cash).toLocaleString()}
+let liftType='chairlift';
+function setLiftType(t){liftType=t;mode='lift';drawPts=[];toast(t==='chairlift'?'Chairlift selected':t==='gondola'?'Gondola selected':'Magic carpet selected')}
+chair.onclick=()=>setLiftType('chairlift');gondola.onclick=()=>setLiftType('gondola');magic.onclick=()=>setLiftType('magic');
 function modeSet(m){mode=m;drawPts=[];document.querySelectorAll('#bar button').forEach(b=>b.classList.remove('on'));document.getElementById(m==='select'?'sel':m==='piste'?'bp':'bl').classList.add('on');fin.style.display=m==='piste'?'block':'none'}
 sel.onclick=()=>modeSet('select');bp.onclick=()=>modeSet('piste');bl.onclick=()=>modeSet('lift');fin.onclick=()=>{if(drawPts.length>2){addPiste(drawPts.map(q=>[q[0],H(q[0],q[1])+.35,q[1]]));drawPts=[];toast('3D piste built')}else toast('Add 3+ points')};gr.onclick=()=>{pistes.forEach(p=>p.condition=100);cash-=450;toast('Pistes groomed');ui()};nw.onclick=()=>{snow=Math.min(1,snow+.25);heat=Math.max(0,heat-.1);toast('Heavy snowfall');ui()};su.onclick=()=>{heat=Math.min(1,heat+.25);snow=Math.max(0,snow-.08);toast('Sunny weather');ui()};pa.onclick=()=>{paused=!paused;pa.textContent=paused?'PLAY':'PAUSE'};sp.onclick=()=>{spd=spd===1?2:spd===2?4:1;sp.textContent=spd+'×'};
 function point(e){let x=e.clientX/innerWidth*54-27,z=(1-e.clientY/innerHeight)*54-27;return[x,z]}
-c.onpointerdown=e=>{if(mode==='select'){drag=true;lx=e.clientX;ly=e.clientY;return}let [x,z]=point(e);if(mode==='piste'){drawPts.push([x,z]);toast('Piste point '+drawPts.length)}else{drawPts.push([x,z]);if(drawPts.length===2){lifts.push({a:drawPts[0],b:drawPts[1],phase:Math.random()*6});cash-=3500;drawPts=[];toast('Chairlift built — £3,500');ui()}}};c.onpointermove=e=>{if(!drag||mode!=='select')return;yaw+=(e.clientX-lx)*.006;pitch=Math.max(.35,Math.min(1.25,pitch-(e.clientY-ly)*.004));lx=e.clientX;ly=e.clientY};c.onpointerup=()=>drag=false;c.onwheel=e=>dist=Math.max(35,Math.min(110,dist+e.deltaY*.06));
+c.onpointerdown=e=>{if(mode==='select'){drag=true;lx=e.clientX;ly=e.clientY;return}let [x,z]=point(e);if(mode==='piste'){drawPts.push([x,z]);toast('Piste point '+drawPts.length)}else{drawPts.push([x,z]);if(drawPts.length===2){let cost=liftType==='chairlift'?3500:liftType==='gondola'?8500:1800;
+lifts.push({type:liftType,a:drawPts[0],b:drawPts[1],phase:Math.random()*6,capacity:liftType==='gondola'?8:liftType==='chairlift'?4:20,speed:liftType==='gondola'?.75:liftType==='chairlift'?1:1.3});
+cash-=cost;drawPts=[];toast((liftType==='chairlift'?'Chairlift':liftType==='gondola'?'Gondola':'Magic carpet')+' built — £'+cost.toLocaleString());ui()}}};c.onpointermove=e=>{if(!drag||mode!=='select')return;yaw+=(e.clientX-lx)*.006;pitch=Math.max(.35,Math.min(1.25,pitch-(e.clientY-ly)*.004));lx=e.clientX;ly=e.clientY};c.onpointerup=()=>drag=false;c.onwheel=e=>dist=Math.max(35,Math.min(110,dist+e.deltaY*.06));
 let last=performance.now();function frame(now){let dt=Math.min(.04,(now-last)/16.67);last=now;if(!paused){for(let q of guests){let p=pistes[q.p];q.t+=.0025*dt*spd*(.7+.7*q.skill);if(q.t>=1){q.t=0;q.p=Math.floor(Math.random()*pistes.length);cash+=1.2}}for(let p of pistes)p.condition=Math.max(0,p.condition-.002*dt*spd)}g.enable(g.DEPTH_TEST);g.clearColor(.40,.63,.78,1);g.clear(g.COLOR_BUFFER_BIT|g.DEPTH_BUFFER_BIT);g.useProgram(pg);let eye=[Math.sin(yaw)*Math.cos(pitch)*dist,Math.sin(pitch)*dist,Math.cos(yaw)*Math.cos(pitch)*dist],P=Pers(.82,c.width/c.height,.1,220),V=Look(eye,[0,9,0]);g.uniformMatrix4fv(L.P,false,P);g.uniformMatrix4fv(L.V,false,V);g.uniform3f(L.sun,-.45,1,.3);g.uniform1f(L.snow,snow);g.uniform1f(L.heat,heat);draw(TERR,I());for(let p of pistes)draw(p.m,I());
 for(let b of buildings){let x=b[0],z=b[1],y=H(x,z);draw(BOX,Mul(T(x,y+b[4]/2,z),Sc(b[2],b[4],b[3])));draw(BOX,Mul(T(x,y+b[4]+.4,z),Sc(b[2]*1.12,.55,b[3]*1.12)))}
-for(let l of lifts){let ax=l.a[0],az=l.a[1],bx=l.b[0],bz=l.b[1];for(let i=0;i<7;i++){let t=i/6,x=ax+(bx-ax)*t,z=az+(bz-az)*t,y=H(x,z)+2.4;draw(BOX,Mul(T(x,y,z),Sc(.18,2.4,.18)))}let ph=(now/1000+l.phase)%1;for(let i=0;i<8;i++){let t=(i/8+ph)%1,x=ax+(bx-ax)*t,z=az+(bz-az)*t,y=H(x,z)+3.5;draw(BOX,Mul(T(x,y,z),Sc(.38,.12,.38)))}}
+for(let l of lifts){
+ let ax=l.a[0],az=l.a[1],bx=l.b[0],bz=l.b[1],dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz)||1;
+ if(l.type!=='magic'){
+   for(let i=0;i<9;i++){let t=i/8,x=ax+dx*t,z=az+dz*t,y=H(x,z)+2.8;draw(BOX,Mul(T(x,y,z),Sc(l.type==='gondola'?.24:.18,2.8,l.type==='gondola'?.24:.18)))}
+   // cable segments
+   for(let i=0;i<22;i++){let t=i/21,x=ax+dx*t,z=az+dz*t,y=H(x,z)+3.9;draw(BOX,Mul(T(x,y,z),Sc(.035,.035,.035)))}
+   let ph=(now/1100+l.phase)%1, count=l.type==='gondola'?7:11;
+   for(let i=0;i<count;i++){let t=(i/count+ph)%1,x=ax+dx*t,z=az+dz*t,y=H(x,z)+3.7;
+      if(l.type==='gondola'){draw(BOX,Mul(T(x,y-.18,z),Sc(.62,.42,.62)));draw(BOX,Mul(T(x,y+.22,z),Sc(.08,.55,.08)))}
+      else {draw(BOX,Mul(T(x,y-.22,z),Sc(.46,.10,.18)));draw(BOX,Mul(T(x,y-.02,z),Sc(.05,.45,.05)));}
+   }
+ } else {
+   // magic carpet: low conveyor with repeated moving mats
+   for(let i=0;i<8;i++){let t=i/7,x=ax+dx*t,z=az+dz*t,y=H(x,z)+.55;draw(BOX,Mul(T(x,y,z),Sc(.75,.10,.42)))}
+   let ph=(now/700+l.phase)%1;for(let i=0;i<14;i++){let t=(i/14+ph)%1,x=ax+dx*t,z=az+dz*t,y=H(x,z)+.67;draw(BOX,Mul(T(x,y,z),Sc(.18,.04,.30)))}
+ }
+}
 for(let i=0;i<100;i++){let x=(i*17.31%54)-27,z=(i*29.17%54)-27;if(Math.hypot(x,z)<10)continue;let y=H(x,z);draw(BOX,Mul(T(x,y+.8,z),Sc(.3,1.6,.3)));draw(BOX,Mul(T(x,y+2.0,z),Sc(1.15,1.8,1.15)))}
 for(let q of guests){let p=pistes[q.p],a=p.p[Math.min(p.p.length-2,Math.floor(q.t*(p.p.length-1)))],b=p.p[Math.min(p.p.length-1,Math.floor(q.t*(p.p.length-1))+1)],t=q.t*(p.p.length-1)%1,x=a[0]+(b[0]-a[0])*t,z=a[2]+(b[2]-a[2])*t,y=H(x,z)+.65;draw(BOX,Mul(T(x,y,z),Sc(.28,.7,.28)))}
 for(let q of drawPts)draw(BOX,Mul(T(q[0],H(q[0],q[1])+.8,q[1]),Sc(.3,.3,.3)));ui();requestAnimationFrame(frame)}requestAnimationFrame(frame);
