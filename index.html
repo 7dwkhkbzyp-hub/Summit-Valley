@@ -44,4 +44,13 @@ for(let l of lifts){let ax=l.a[0],az=l.a[1],bx=l.b[0],bz=l.b[1];for(let i=0;i<7;
 for(let i=0;i<100;i++){let x=(i*17.31%54)-27,z=(i*29.17%54)-27;if(Math.hypot(x,z)<10)continue;let y=H(x,z);draw(BOX,Mul(T(x,y+.8,z),Sc(.3,1.6,.3)));draw(BOX,Mul(T(x,y+2.0,z),Sc(1.15,1.8,1.15)))}
 for(let q of guests){let p=pistes[q.p],a=p.p[Math.min(p.p.length-2,Math.floor(q.t*(p.p.length-1)))],b=p.p[Math.min(p.p.length-1,Math.floor(q.t*(p.p.length-1))+1)],t=q.t*(p.p.length-1)%1,x=a[0]+(b[0]-a[0])*t,z=a[2]+(b[2]-a[2])*t,y=H(x,z)+.65;draw(BOX,Mul(T(x,y,z),Sc(.28,.7,.28)))}
 for(let q of drawPts)draw(BOX,Mul(T(q[0],H(q[0],q[1])+.8,q[1]),Sc(.3,.3,.3)));ui();requestAnimationFrame(frame)}requestAnimationFrame(frame);
+
+/* v0.2 additions: local sandbox save/load + PWA offline support */
+const saveBtn=document.createElement('button');saveBtn.textContent='SAVE';saveBtn.id='saveGame';
+const loadBtn=document.createElement('button');loadBtn.textContent='LOAD';loadBtn.id='loadGame';
+document.getElementById('bar').append(saveBtn,loadBtn);
+saveBtn.onclick=()=>{localStorage.setItem('summitValleySave',JSON.stringify({cash,snow,heat,pistes:pistes.map(p=>({p:p.p,t:p.t,condition:p.condition})),lifts,buildings}));toast('Resort saved on this iPhone')};
+loadBtn.onclick=()=>{let z=localStorage.getItem('summitValleySave');if(!z)return toast('No save found');try{let q=JSON.parse(z);cash=q.cash;snow=q.snow;heat=q.heat;pistes=q.pistes.map(p=>({...p,m:Ribbon(p.p,.85,PC[p.t])}));lifts=q.lifts;buildings=q.buildings;toast('Resort loaded');ui()}catch(e){toast('Save could not be loaded')}};
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
+
 </script></body></html>
