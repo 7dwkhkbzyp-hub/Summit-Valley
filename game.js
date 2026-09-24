@@ -174,7 +174,66 @@ function chalet(n,x,z,s=1){const y=height(x,z),e=new pc.Entity(n);e.setLocalPosi
 chalet("Summit Lodge",-5,-24,1.35);chalet("Piste House",18,-16,.9);chalet("Mountain Hotel",-27,-14,1.25);
 
 function station(n,x,z,type="chair"){const y=height(x,z),e=new pc.Entity(n);e.setLocalPosition(x,y,z);app.root.addChild(e);box("station body",[6,2.8,4.5],[0,1.4,0],steel,e);const r1=box("station roof",[3.6,.5,5.6],[-1.5,3.05,0],roof,e);r1.setLocalEulerAngles(0,0,-22);const r2=box("station roof",[3.6,.5,5.6],[1.5,3.05,0],roof,e);r2.setLocalEulerAngles(0,0,22);box("station glass",[4.4,1.25,.12],[0,1.55,2.28],glass,e);box("station platform",[7,.25,1.3],[0,.25,0],snowBright,e);if(type==="gondola")box("gondola sign",[2.3,.55,.12],[0,2.35,2.4],gondola,e);if(type==="chair"||type==="gondola")replaceWithGLB(e,type==="gondola"?GLB.bottomStation:GLB.bottomStation,1);}
-function makeLift(n,a,b,count,type="chair"){const root=new pc.Entity(n);app.root.addChild(root);const[ax,az]=a,[bx,bz]=b,dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz)||1,ay=height(ax,az)+3.1,by=height(bx,bz)+3.1,ang=Math.atan2(dx,dz)*180/Math.PI;station(n+" base",ax,az,type);station(n+" summit",bx,bz,type);for(let i=1;i<9;i++){const t=i/9,x=ax+dx*t,z=az+dz*t,y=height(x,z)+2.7,tower=new pc.Entity(n+" tower");tower.setLocalPosition(x,y,z);root.addChild(tower);cyl("tower leg",[.24,5,.24],[0,-2.5,0],steel,tower);box("crossarm",[3.2,.2,.35],[0,0,0],steel,tower);mountGLB(GLB.chairTower,tower,.78,[0,0,0]);for(const sx of[-1,1])sphere("sheave",[.28,.28,.28],[sx*1.35,-.18,0],cable,tower)}const rope=box("haul cable",[.065,.065,len],[(ax+bx)/2,(ay+by)/2,(az+bz)/2],cable,root);rope.setLocalEulerAngles(0,ang,Math.atan2(by-ay,len)*180/Math.PI);const carriers=[];for(let i=0;i<count;i++){const e=new pc.Entity(n+" carrier "+i);root.addChild(e);e._phase=i/count;e._a=[ax,ay,az];e._b=[bx,by,bz];if(type==="gondola"){mountGLB(GLB.gondola,e,.58,[0,0,0]);box("cabin",[1.25,1.05,.9],[0,-.2,0],gondola,e);box("cabin glass",[1,.65,.08],[0,-.15,.47],glass,e);box("hanger",[.07,1.35,.07],[0,.82,0],steel,e)}else{mountGLB(GLB.chair,e,.62,[0,0,0]);box("seat",[1.3,.16,.48],[0,-.58,0],chair,e);box("back",[1.3,.7,.11],[0,-.18,0],chair,e);box("hanger",[.07,1.5,.07],[0,.6,0],steel,e)}carriers.push(e)}return carriers}
+function beamBetween(name,a,b,radius,material,parent=app.root){
+ const A=new pc.Vec3(a[0],a[1],a[2]),B=new pc.Vec3(b[0],b[1],b[2]);
+ const dx=B.x-A.x,dy=B.y-A.y,dz=B.z-A.z,len=Math.hypot(dx,dy,dz)||1;
+ const e=cyl(name,[radius,len/2,radius],[(A.x+B.x)/2,(A.y+B.y)/2,(A.z+B.z)/2],material,parent);
+ // Cylinder local Y is its long axis. Build a quaternion rotating +Y onto the cable direction.
+ const vx=dx/len,vy=dy/len,vz=dz/len;
+ const ax=-vz,ay=0,az=vx,dot=vy;
+ const s=Math.sqrt((1+dot)*2);
+ if(s>1e-5){e.setLocalRotation(new pc.Quat(ax/s,ay/s,az/s,s*.5));}
+ return e;
+}
+function makeLift(n,a,b,count,type="chair"){
+ const root=new pc.Entity(n);app.root.addChild(root);
+ const [ax,az]=a,[bx,bz]=b,dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz)||1;
+ const groundA=height(ax,az)+.15,groundB=height(bx,bz)+.15;
+ const cableA=groundA+5.6,cableB=groundB+5.6;
+ station(n+" base",ax,az,type);station(n+" summit",bx,bz,type);
+
+ // One continuous cable, mathematically anchored at both station points.
+ beamBetween("Continuous haul cable",[ax,cableA,az],[bx,cableB,bz],.075,cable,root);
+
+ // Towers are constructed from the terrain upward until they physically meet the cable.
+ for(let i=1;i<9;i++){
+   const t=i/9,x=ax+dx*t,z=az+dz*t;
+   const ground=height(x,z)+.12;
+   const cableY=pc.math.lerp(cableA,cableB,t);
+   const h=Math.max(2.4,cableY-ground);
+   const tower=new pc.Entity(n+" tower "+i);
+   tower.setPosition(x,ground+h/2,z);root.addChild(tower);
+   cyl("tower column",[.27,h,.27],[0,0,0],steel,tower);
+   box("tower crossarm",[3.6,.22,.42],[0,h/2-.18,0],steel,tower);
+   for(const sx of[-1,1]){
+     sphere("sheave",[.31,.31,.31],[sx*1.38,h/2-.48,0],cable,tower);
+     sphere("sheave axle",[.11,.11,.11],[sx*1.38,h/2-.48,0],steel,tower);
+   }
+   // Safety padding makes towers readable from the management camera.
+   box("tower safety pad",[.68,2.1,.34],[0,1.05,0],red,tower);
+   box("tower pad band",[.70,.22,.36],[0,1.48,0],snowBright,tower);
+ }
+
+ const carriers=[];
+ for(let i=0;i<count;i++){
+   const e=new pc.Entity(n+" carrier "+i);root.addChild(e);
+   e._phase=i/count;e._a=[ax,cableA,az];e._b=[bx,cableB,bz];
+   if(type==="gondola"){
+     const model=mountGLB(GLB.gondola,e,.58,[0,0,0]);
+     box("gondola cabin", [1.35,1.15,.95],[0,-1.25,0],gondola,e);
+     box("gondola glass",[1.08,.72,.08],[0,-1.23,.50],glass,e);
+     box("gondola hanger",[.08,1.35,.08],[0,-.55,0],steel,e);
+   }else{
+     mountGLB(GLB.chair,e,.62,[0,0,0]);
+     box("chair seat",[1.45,.17,.52],[0,-1.12,0],chair,e);
+     box("chair back",[1.45,.78,.12],[0,-.76,0],chair,e);
+     box("chair hanger",[.08,1.55,.08],[0,-.15,0],steel,e);
+     box("chair footrest",[1.25,.08,.10],[0,-1.42,.30],steel,e);
+   }
+   carriers.push(e);
+ }
+ return carriers;
+}
 
 function makeSurfaceLift(n,a,b,type="tbar"){
  const root=new pc.Entity(n);app.root.addChild(root);
@@ -656,7 +715,7 @@ window.addEventListener("beforeunload",saveGame);
 
 
 const camera=new pc.Entity("Camera");camera.addComponent("camera",{clearColor:new pc.Color(.63,.77,.88),fov:46});app.root.addChild(camera);
-let yaw=-31,pitch=32,distance=112,target=new pc.Vec3(0,19,4);
+let yaw=-34,pitch=38,distance=106,target=new pc.Vec3(0,25,11);
 function updateCamera(){const yr=yaw*Math.PI/180,pr=pitch*Math.PI/180;camera.setPosition(target.x+Math.sin(yr)*Math.cos(pr)*distance,target.y+Math.sin(pr)*distance,target.z+Math.cos(yr)*Math.cos(pr)*distance);camera.lookAt(target)}
 updateCamera();
 const pointers=new Map();let lastDist=0;
