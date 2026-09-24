@@ -1,1 +1,35 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"><meta name="theme-color" content="#07111b"><title>Summit Valley — Ski Resort Tycoon</title><link rel="manifest" href="./manifest.json"><link rel="stylesheet" href="./style.css"></head><body><div id="loading"><div class="load-card"><div class="logo">SUMMIT <span>VALLEY</span></div><div class="load-bar"><i></i></div><small>Building the mountain…</small></div></div><canvas id="application-canvas"></canvas><div id="hud"><div class="topbar"><div class="brand">SUMMIT VALLEY <b>TYCOON</b></div><div class="stats"><span>£<strong id="cash">250,000</strong></span><span>Guests <strong id="guests">0</strong></span><span>Rep <strong id="rep">72</strong></span><span>☀ <strong id="weather">Clear</strong></span></div></div><div class="left-panel"><button class="tool active" data-tool="select">↖ Select</button><button class="tool" data-tool="lift">🚡 Chairlift</button><button class="tool" data-tool="piste">⛷ Piste</button><button class="tool" data-tool="hotel">🏨 Hotel</button><button class="tool" data-tool="bar">🍻 Alpine Bar</button><button class="tool" data-tool="cafe">☕ Café</button><button class="tool" data-tool="snow">❄ Snowmaker</button></div><div class="bottom-panel"><div><b>SUMMIT VALLEY</b><small>Alpine Region • Day 1 • 09:15</small></div><button id="weatherBtn">Weather</button><button id="pauseBtn">Ⅱ</button><button id="resetBtn">↻</button></div><div id="toast"></div></div><script type="module" src="./game.js"></script></body></html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"><meta name="theme-color" content="#07111b"><title>Summit Valley — Ski Resort Tycoon</title><link rel="manifest" href="./manifest.json"><link rel="stylesheet" href="./style.css"></head><body><div id="loading"><div class="load-card"><div class="logo">SUMMIT <span>VALLEY</span></div><div class="load-bar"><i></i></div><small id="loadingStatus">Building the mountain…</small></div></div>
+<div id="mainMenu">
+  <div class="menu-vignette"></div>
+  <div class="menu-content">
+    <div class="eyebrow">ALPINE RESORT MANAGEMENT</div>
+    <h1>SUMMIT<br><span>VALLEY</span></h1>
+    <p>Build it. Ski it. Own the mountain.</p>
+    <div class="menu-buttons">
+      <button data-menu="new">PLAY — NEW RESORT</button>
+      <button data-menu="sandbox">SANDBOX</button>
+      <button data-menu="scenarios">SCENARIOS</button>
+      <button data-menu="continue">CONTINUE</button>
+      <button data-menu="settings">SETTINGS</button>
+    </div>
+    <div class="menu-foot">A browser-first alpine tycoon • touch ready</div>
+  </div>
+</div><canvas id="application-canvas"></canvas><div id="hud"><div class="topbar"><div class="brand">SUMMIT VALLEY <b>TYCOON</b></div><div class="stats"><span>£<strong id="cash">250,000</strong></span><span>Guests <strong id="guests">0</strong></span><span>Rep <strong id="rep">72</strong></span><span>☀ <strong id="weather">Clear</strong></span></div></div><div class="left-panel">
+<button class="tool active" data-tool="select">↖ Select</button>
+<button class="tool" data-tool="building">🏔 Build</button>
+<button class="tool" data-tool="lift">🚡 Lifts</button>
+<button class="tool" data-tool="piste">⛷ Pistes</button>
+<button class="tool" data-tool="snow">❄ Snowmaker</button>
+</div>
+<div id="buildPanel" class="build-panel">
+  <div class="panel-title"><b>BUILD</b><button id="closeBuild">×</button></div>
+  <div class="build-tabs">
+    <button class="build-tab active" data-cat="lodging">Lodging</button>
+    <button class="build-tab" data-cat="food">Food & Drink</button>
+    <button class="build-tab" data-cat="retail">Retail</button>
+    <button class="build-tab" data-cat="transport">Transport</button>
+  </div>
+  <div id="buildItems"></div>
+  <div id="buildInfo">Select an item to place it on the mountain.</div>
+</div>
+<div id="inspectPanel" class="inspect-panel"></div><div class="bottom-panel"><div><b>SUMMIT VALLEY</b><small>Alpine Region • Day 1 • 09:15</small></div><button id="weatherBtn">Weather</button><button id="pauseBtn">Ⅱ</button><button id="resetBtn">↻</button></div><div id="toast"></div></div><script type="module" src="./game.js"></script></body></html>
