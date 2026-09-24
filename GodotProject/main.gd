@@ -390,6 +390,39 @@ func _spawn_guest(i:int)->void:
     guests.append(g)
     guest_root.add_child(n)
 
+func _skier(i:int)->Node3D:
+    var n:=Node3D.new()
+    n.name="Skier_"+str(i)
+    var jackets=[Color("#d84b42"),Color("#397bc5"),Color("#e2a52f"),Color("#744db1"),Color("#24a578"),Color("#ed7834")]
+    var jacket=jackets[i%jackets.size()]
+    var body:=_box(Vector3(0.62,1.2,0.48),jacket)
+    body.position.y=1.12
+    n.add_child(body)
+    var head:=_sphere(0.39,Color("#efc5a5"))
+    head.position.y=2.02
+    n.add_child(head)
+    var helmet:=_sphere(0.44,Color("#20262b"))
+    helmet.scale=Vector3(1,0.64,1)
+    helmet.position.y=2.28
+    n.add_child(helmet)
+    var goggles:=_box(Vector3(0.43,0.13,0.10),Color("#73c8dc"))
+    goggles.position=Vector3(0,2.07,-0.34)
+    n.add_child(goggles)
+    var pants:=_box(Vector3(0.68,0.72,0.5),Color("#252b33"))
+    pants.position.y=0.42
+    n.add_child(pants)
+    for s in [-1.0,1.0]:
+        var ski:=_box(Vector3(0.10,0.07,2.15),Color("#f4f6f7"))
+        ski.position=Vector3(s*0.22,0.10,0)
+        n.add_child(ski)
+        var boot:=_box(Vector3(0.20,0.22,0.45),Color("#15191d"))
+        boot.position=Vector3(s*0.22,0.22,-0.18)
+        n.add_child(boot)
+        n.add_child(_beam(Vector3(s*0.38,1.05,-0.05),Vector3(s*0.50,0.05,-0.65),0.025,Color("#30363b")))
+    n.add_child(_beam(Vector3(-0.32,1.55,0),Vector3(-0.58,1.0,-0.15),0.09,jacket))
+    n.add_child(_beam(Vector3(0.32,1.55,0),Vector3(0.58,1.0,-0.15),0.09,jacket))
+    return n
+
 func _nearest_lift_to_point(p:Vector3)->int:
     var best:=-1
     var best_dist:=INF
