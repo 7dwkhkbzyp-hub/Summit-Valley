@@ -340,8 +340,9 @@ func _lift_cable_position(data:Dictionary,t:float,run:float)->Vector3:
     var b:Vector3=data["b"]
     var span:Vector3=(b-a).normalized()
     var side:Vector3=span.cross(Vector3.UP).normalized()
-    var y:=9.5-sin(t*PI)*2.2
-    return a.lerp(b,t)+Vector3.UP*y+side*(run*2.15)
+    var u:=t if run>0.0 else 1.0-t
+    var y:=9.5-sin(u*PI)*2.2
+    return a.lerp(b,u)+Vector3.UP*y+side*(run*2.15)
 
 func _lift_station(pos:Vector3,side:String,type_name:String)->void:
     var root:=Node3D.new()
@@ -439,13 +440,14 @@ func _nearest_carrier_at_bottom(lift_index:int)->Node3D:
     var d:Dictionary=lifts[lift_index]
     var best:Node3D=null
     var best_dist:=INF
+    # Only the uphill line approaches the boarding station.
     for c in d["carriers"]:
         if bool(c.get_meta("has_rider")): continue
+        if float(c.get_meta("lift_run")) < 0.0: continue
         var t=float(c.get_meta("lift_t"))
-        var dist:=min(t,1.0-t)
-        if t<0.22 and dist<best_dist:
+        if t <= 0.14 and t<best_dist:
             best=c
-            best_dist=dist
+            best_dist=t
     return best
 
 func _route_from_lift_top(lift_index:int)->int:
@@ -512,17 +514,26 @@ func _animate_guests(dt:float)->void:
                 continue
             var d:Dictionary=lifts[li]
             var bottom:Vector3=d["a"]
-            var q_index:=int(g.get("queue_slot",0))
             var span:Vector3=(d["b"]-d["a"]).normalized()
             var side:Vector3=span.cross(Vector3.UP).normalized()
-            n.position=bottom+side*((q_index-2)*1.7)+Vector3(0,0.8,4.5)
+
+            var q_index:=0
+            for other in guests:
+                if other == g:
+                    break
+                if other.get("state","")=="queue" and int(other.get("lift",-1))==li:
+                    q_index+=1
+            g["queue_slot"]=q_index
+
+            # Guests line up behind the boarding gate. Only the first guest boards.
+            n.position=bottom+Vector3(0,0.85,3.2)+span*float(q_index)*2.0
             n.rotation.y=atan2(span.x,span.z)
             var carrier:=_nearest_carrier_at_bottom(li)
-            if carrier!=null:
+            if q_index==0 and carrier!=null:
                 g["carrier"]=carrier
                 g["state"]="lift"
                 carrier.set_meta("has_rider",true)
-                g["queue_slot"]=0
+                n.global_position=carrier.global_position+Vector3(0,-3.25,0)
 
         elif g["state"]=="lift":
             var carrier:Node3D=g["carrier"]
@@ -531,13 +542,14 @@ func _animate_guests(dt:float)->void:
                 g["carrier"]=null
                 continue
             var ct:float=carrier.get_meta("lift_t")
+            var run:float=carrier.get_meta("lift_run")
             var li:int=g["lift"]
             var d:Dictionary=lifts[li]
             n.global_position=carrier.global_position+Vector3(0,-3.25,0)
             n.rotation.y=atan2((d["b"]-d["a"]).x,(d["b"]-d["a"]).z)
             if ct>0.965:
                 carrier.set_meta("has_rider",false)
-                var next_route:=_route_from_lift_top(li)
+                var next_route:=_route_from_lift_top(li) if run>0.0 else -1
                 if next_route>=0:
                     g["route"]=next_route
                     g["t"]=0.0
@@ -548,6 +560,7 @@ func _animate_guests(dt:float)->void:
                     g["state"]="ski"
                     g["t"]=0.0
                     g["carrier"]=null
+                    n.global_position=(d["a"] if run<0.0 else d["b"])+Vector3.UP*0.75
 
 func _animate_lifts(dt:float)->void:
     # Move every chair/cabin along the exact cable path used to place it.
