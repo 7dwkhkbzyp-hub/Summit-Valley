@@ -166,7 +166,6 @@ paths.forEach(path=>{path.pts.forEach(([x,z],i)=>{const prev=path.pts[Math.max(0
 
 function ribbon(path){const verts=[],inds=[],normals=[];for(let i=0;i<path.pts.length;i++){const[x,z]=path.pts[i],prev=path.pts[Math.max(0,i-1)],next=path.pts[Math.min(path.pts.length-1,i+1)],dx=next[0]-prev[0],dz=next[1]-prev[1],l=Math.hypot(dx,dz)||1,nx=-dz/l,nz=dx/l,w=path.width/2,left=[x+nx*w,z+nz*w],right=[x-nx*w,z-nz*w];verts.push(left[0],height(left[0],left[1])+.18,left[1],right[0],height(right[0],right[1])+.18,right[1]);normals.push(0,1,0,0,1,0)}for(let i=0;i<path.pts.length-1;i++){const q=i*2;inds.push(q,q+1,q+2,q+1,q+3,q+2)}meshEntity(path.name+" groomed piste",verts,inds,path.color,normals);path.pts.forEach(([x,z],i)=>{if(i%2===0){const dx=path.pts[Math.min(path.pts.length-1,i+1)][0]-path.pts[Math.max(0,i-1)][0],dz=path.pts[Math.min(path.pts.length-1,i+1)][1]-path.pts[Math.max(0,i-1)][1],l=Math.hypot(dx,dz)||1,nx=-dz/l,nz=dx/l;for(const s of[-1,1]){const px=x+nx*(path.width*.64)*s,pz=z+nz*(path.width*.64)*s;cyl(path.name+" marker pole",[.045,1.25,.045],[px,height(px,pz)+.62,pz],yellow)}}})}
 paths.forEach(ribbon);
-if(snowFx&&snowFx.particlesystem)snowFx.particlesystem.enabled=false;
 
 function signAt(text,x,z,color){const y=height(x,z)+1.2,e=new pc.Entity(text);e.setLocalPosition(x,y,z);app.root.addChild(e);cyl("sign post",[.06,1.3,.06],[0,-.65,0],steel,e);box("sign board",[1.55,.62,.1],[0,.05,0],color,e)}
 signAt("MEADOW",-18,1,green);signAt("RIDGE",12,1,red);signAt("GLACIER",18,4,blue);signAt("COULOIR",29,4,black);
@@ -359,7 +358,7 @@ mountGLB(GLB.groomer,(()=>{const e=new pc.Entity("Production Snow Groomer 2");e.
 
 
 // Optional snow particle effect. PlayCanvas supports GPU particle systems; keep it lightweight for iPhone Safari.
-let snowFx=null;
+
 try{
  snowFx=new pc.Entity("Atmospheric snow");
  snowFx.setLocalPosition(0,55,0);app.root.addChild(snowFx);
@@ -380,6 +379,7 @@ try{
 }catch(err){console.warn("Snow particles unavailable",err)}
 
 
+let snowFx=null;
 const guests=[];function samplePath(path,t){const f=t*(path.pts.length-1),i=Math.min(path.pts.length-2,Math.floor(f)),q=f-i;return[path.pts[i][0]+(path.pts[i+1][0]-path.pts[i][0])*q,path.pts[i][1]+(path.pts[i+1][1]-path.pts[i][1])*q]}
 function makeSkier(i,route,t,type){
  const p=samplePath(paths[route],t),y=height(p[0],p[1])+.04,e=new pc.Entity((type==="snowboarder"?"Snowboarder ":"Skier ")+i);
