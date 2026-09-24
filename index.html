@@ -4,7 +4,7 @@
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07131f;color:#fff;font-family:system-ui,-apple-system,sans-serif;touch-action:none}canvas{position:fixed;inset:0;width:100%;height:100%}.p{background:rgba(5,13,22,.78);border:1px solid #ffffff20;border-radius:14px;backdrop-filter:blur(12px);box-shadow:0 10px 30px #0006}#logo{position:fixed;top:12px;left:12px;padding:10px 14px;font-weight:900;letter-spacing:.15em}#logo b{color:#55d5ff}#stats{position:fixed;top:12px;right:12px;padding:8px 12px;display:flex;gap:16px;font-size:10px;color:#a8bac8}.s b{display:block;color:#fff;font-size:13px}#bar{position:fixed;bottom:12px;left:12px;right:12px;padding:7px;display:flex;gap:5px;flex-wrap:wrap}button{background:#142b40;color:#eef8ff;border:1px solid #ffffff14;border-radius:9px;padding:9px 11px;font-weight:800;font-size:11px}button.on{background:#087fae}#info{position:fixed;left:12px;top:62px;padding:10px;width:260px;font-size:11px;color:#aec0cf;line-height:1.4}#toast{position:fixed;top:82px;left:50%;transform:translateX(-50%);padding:10px 14px;opacity:0;transition:.2s;font-size:12px}
 @media(max-width:650px){#stats .s:nth-child(n+4){display:none}button{padding:10px 9px}}
 </style></head><body>
-<canvas id="c"></canvas><div id="logo" class="p">SUMMIT <b>VALLEY</b></div>
+<canvas id="c"></canvas><div id="logo" class="p">SUMMIT <b>VALLEY</b><small style="display:block;font-size:8px;letter-spacing:.12em;color:#8ea6b8">ALPINE RESORT TYCOON</small></div>
 <div id="stats" class="p"><div class="s">SNOW<b id="sn">92 cm</b></div><div class="s">GUESTS<b id="gu">60</b></div><div class="s">PISTES<b id="pi">5</b></div><div class="s">LIFTS<b id="lf">2</b></div><div class="s">REPUTATION<b id="rep">72%</b></div><div class="s">CASH<b id="ca">£24,800</b></div></div>
 <div id="info" class="p"><b>SUMMIT VALLEY — RESORT MANAGEMENT</b><br>Build the resort, not just the scenery. Guests ski, visit facilities, spend money and affect reputation. Build pistes and lifts, manage weather and grooming, then expand.</div>
 <div id="toast" class="p"></div>
@@ -32,6 +32,13 @@ function H(x,z){let r=Math.hypot(x,z),y=28*Math.max(0,1-r/53);y+=7*Math.exp(-((x
 function N(x,z){let e=.25,a=H(x-e,z),b=H(x+e,z),q=H(x,z-e),r=H(x,z+e),v=[a-b,2*e,q-r],l=Math.hypot(...v);return v.map(x=>x/l)}
 function Mesh(v){let a=g.createVertexArray(),b=g.createBuffer();g.bindVertexArray(a);g.bindBuffer(g.ARRAY_BUFFER,b);g.bufferData(g.ARRAY_BUFFER,new Float32Array(v),g.STATIC_DRAW);[[L.p,0],[L.n,3],[L.c,6]].forEach(x=>{g.enableVertexAttribArray(x[0]);g.vertexAttribPointer(x[0],3,g.FLOAT,false,36,x[1]*4)});return{a,n:v.length/9}}
 function Cube(){let q=[[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]],f=[[0,1,2,0,2,3],[4,6,5,4,7,6],[0,4,5,0,5,1],[3,2,6,3,6,7],[1,5,6,1,6,2],[0,3,7,0,7,4]],ns=[[0,0,-1],[0,0,1],[0,-1,0],[0,1,0],[1,0,0],[-1,0,0]],v=[];for(let k=0;k<6;k++)for(let i of f[k]){let p=q[i];v.push(p[0],p[1],p[2],...ns[k],.45,.5,.55)}return Mesh(v)}const BOX=Cube();
+function Mat(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p){return new Float32Array([a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p])}
+function Tube(a,b,r,col){let v=[],dx=b[0]-a[0],dy=b[1]-a[1],dz=b[2]-a[2],L=Math.hypot(dx,dy,dz)||1;let ux=dx/L,uy=dy/L,uz=dz/L,ax=Math.abs(uy)<.9?[0,1,0]:[1,0,0],vx=uy*ax[2]-uz*ax[1],vy=uz*ax[0]-ux*ax[2],vz=ux*ax[1]-uy*ax[0],vl=Math.hypot(vx,vy,vz);vx/=vl;vy/=vl;vz/=vl;let wx=uy*vz-uz*vy,wy=uz*vx-ux*vz,wz=ux*vy-uy*vx,N=8;for(let t=0;t<=1;t++)for(let q=0;q<N;q++){let ang=q*Math.PI*2/N,rr=r*Math.cos(ang),ss=r*Math.sin(ang),cx=a[0]+dx*t+vx*rr+wx*ss,cy=a[1]+dy*t+vy*rr+wy*ss,cz=a[2]+dz*t+vz*rr+wz*ss;v.push(cx,cy,cz,cx,cy,cz,...col)}let out=[];for(let t=0;t<1;t++)for(let q=0;q<N;q++){let A=t*N+q,B=t*N+(q+1)%N,C=(t+1)*N+(q+1)%N,D=(t+1)*N+q;for(let z of [A,B,C,A,C,D])out.push(...v.slice(z*9,z*9+9))}return Mesh(out)}
+function tree(x,z,scale=1){let y=H(x,z);return [
+ [BOX,Mul(T(x,y+1*scale,z),Sc(.22*scale,1.1*scale,.22*scale))],
+ [BOX,Mul(T(x,y+2.1*scale,z),Sc(1.05*scale,1.35*scale,1.05*scale))],
+ [BOX,Mul(T(x,y+3.0*scale,z),Sc(.72*scale,1.0*scale,.72*scale))]]}
+function skier(x,z,ang=0,scale=1){let y=H(x,z)+.45;return [[BOX,Mul(T(x,y+.35*scale,z),Sc(.16*scale,.42*scale,.16*scale))],[BOX,Mul(T(x,y+.82*scale,z),Sc(.22*scale,.22*scale,.22*scale))],[BOX,Mul(T(x+.27*scale*Math.cos(ang),y+.05*scale,z+.27*scale*Math.sin(ang)),Sc(.035*scale,.55*scale,.035*scale))],[BOX,Mul(T(x-.27*scale*Math.cos(ang),y+.05*scale,z-.27*scale*Math.sin(ang)),Sc(.035*scale,.55*scale,.035*scale))]]}
 function draw(m,M){g.bindVertexArray(m.a);g.uniformMatrix4fv(L.M,false,M);g.drawArrays(g.TRIANGLES,0,m.n)}
 function terrain(){let n=75,s=58,v=[];for(let z=0;z<n-1;z++)for(let x=0;x<n-1;x++){let P=[];for(let k of [[x,z],[x+1,z],[x,z+1],[x+1,z+1]]){let X=-s/2+k[0]*s/(n-1),Z=-s/2+k[1]*s/(n-1),Y=H(X,Z)-1.4,nm=N(X,Z);P.push([X,Y,Z,...nm])}for(let tri of [[0,1,2],[1,3,2]])for(let i of tri){let p=P[i];v.push(...p,.20+.004*p[1],.35+.007*p[1],.25+.009*p[1])}}return Mesh(v)}const TERR=terrain();
 const PC={green:[.05,.72,.34],blue:[.04,.35,.9],red:[.9,.07,.09],black:[.025,.03,.035]};
@@ -54,18 +61,19 @@ function point(e){let x=e.clientX/innerWidth*54-27,z=(1-e.clientY/innerHeight)*5
 c.onpointerdown=e=>{if(mode==='select'){drag=true;lx=e.clientX;ly=e.clientY;return}let [x,z]=point(e);if(mode==='piste'){drawPts.push([x,z]);toast('Piste point '+drawPts.length)}else{drawPts.push([x,z]);if(drawPts.length===2){let cost=liftType==='chairlift'?3500:liftType==='gondola'?8500:1800;
 lifts.push({type:liftType,a:drawPts[0],b:drawPts[1],phase:Math.random()*6,capacity:liftType==='gondola'?8:liftType==='chairlift'?4:20,speed:liftType==='gondola'?.75:liftType==='chairlift'?1:1.3});
 cash-=cost;drawPts=[];toast((liftType==='chairlift'?'Chairlift':liftType==='gondola'?'Gondola':'Magic carpet')+' built — £'+cost.toLocaleString());ui()}}};c.onpointermove=e=>{if(!drag||mode!=='select')return;yaw+=(e.clientX-lx)*.006;pitch=Math.max(.35,Math.min(1.25,pitch-(e.clientY-ly)*.004));lx=e.clientX;ly=e.clientY};c.onpointerup=()=>drag=false;c.onwheel=e=>dist=Math.max(35,Math.min(110,dist+e.deltaY*.06));
-let last=performance.now();function frame(now){let dt=Math.min(.04,(now-last)/16.67);last=now;if(!paused){for(let q of guests){let p=pistes[q.p];q.t+=.0025*dt*spd*(.7+.7*q.skill);if(q.t>=1){q.t=0;q.p=Math.floor(Math.random()*pistes.length);cash+=1.2}}for(let p of pistes)p.condition=Math.max(0,p.condition-.002*dt*spd)}g.enable(g.DEPTH_TEST);g.clearColor(.40,.63,.78,1);g.clear(g.COLOR_BUFFER_BIT|g.DEPTH_BUFFER_BIT);g.useProgram(pg);let eye=[Math.sin(yaw)*Math.cos(pitch)*dist,Math.sin(pitch)*dist,Math.cos(yaw)*Math.cos(pitch)*dist],P=Pers(.82,c.width/c.height,.1,220),V=Look(eye,[0,9,0]);g.uniformMatrix4fv(L.P,false,P);g.uniformMatrix4fv(L.V,false,V);g.uniform3f(L.sun,-.45,1,.3);g.uniform1f(L.snow,snow);g.uniform1f(L.heat,heat);draw(TERR,I());for(let p of pistes)draw(p.m,I());
+let last=performance.now();function frame(now){let dt=Math.min(.04,(now-last)/16.67);last=now;if(!paused){for(let q of guests){let p=pistes[q.p];q.t+=.0025*dt*spd*(.7+.7*q.skill);if(q.t>=1){q.t=0;q.p=Math.floor(Math.random()*pistes.length);cash+=1.2}}for(let p of pistes)p.condition=Math.max(0,p.condition-.002*dt*spd)}g.enable(g.DEPTH_TEST);g.clearColor(.34,.55,.72,1);g.clear(g.COLOR_BUFFER_BIT|g.DEPTH_BUFFER_BIT);g.useProgram(pg);let eye=[Math.sin(yaw)*Math.cos(pitch)*dist,Math.sin(pitch)*dist,Math.cos(yaw)*Math.cos(pitch)*dist],P=Pers(.82,c.width/c.height,.1,220),V=Look(eye,[0,9,0]);g.uniformMatrix4fv(L.P,false,P);g.uniformMatrix4fv(L.V,false,V);g.uniform3f(L.sun,-.45,1,.3);g.uniform1f(L.snow,snow);g.uniform1f(L.heat,heat);draw(TERR,I());for(let p of pistes){draw(p.m,I()); // piste edge markers
+ for(let i=0;i<p.p.length-1;i++){let a=p.p[i],b=p.p[i+1],dx=b[0]-a[0],dz=b[2]-a[2],ll=Math.hypot(dx,dz)||1,nx=-dz/ll,nz=dx/ll;for(let side of [-1,1]){let x=a[0]+nx*side*1.05,z=a[2]+nz*side*1.05,y=H(x,z)+.16;draw(BOX,Mul(T(x,y,z),Sc(.035,.25,.035)));}}}
 for(let b of buildings){let x=b[0],z=b[1],y=H(x,z);draw(BOX,Mul(T(x,y+b[4]/2,z),Sc(b[2],b[4],b[3])));draw(BOX,Mul(T(x,y+b[4]+.4,z),Sc(b[2]*1.12,.55,b[3]*1.12)))}
 for(let l of lifts){
  let ax=l.a[0],az=l.a[1],bx=l.b[0],bz=l.b[1],dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz)||1;
  if(l.type!=='magic'){for(let end of [0,1]){let x=end?bx:ax,z=end?bz:az,y=H(x,z);draw(BOX,Mul(T(x,y+1.1,z),Sc(1.8,.7,1.8)));draw(BOX,Mul(T(x,y+2,z),Sc(1.2,.15,1.2)));}
-   for(let i=0;i<9;i++){let t=i/8,x=ax+dx*t,z=az+dz*t,y=H(x,z)+2.8;draw(BOX,Mul(T(x,y,z),Sc(l.type==='gondola'?.24:.18,2.8,l.type==='gondola'?.24:.18)))}
+   for(let i=0;i<9;i++){let t=i/8,x=ax+dx*t,z=az+dz*t,y=H(x,z);let tower=Sc(.14,2.8,.14);draw(BOX,Mul(T(x,y+1.4,z),tower));draw(BOX,Mul(T(x,y+2.75,z),Sc(.7,.12,.7)));}
    // cable segments
-   for(let i=0;i<22;i++){let t=i/21,x=ax+dx*t,z=az+dz*t,y=H(x,z)+3.9;draw(BOX,Mul(T(x,y,z),Sc(.035,.035,.035)))}
+   for(let i=0;i<22;i++){let t=i/21,x=ax+dx*t,z=az+dz*t,y=H(x,z)+3.9;let sag=1.0*Math.sin(Math.PI*t);if(i<21){let x2=ax+dx*(i+1)/21,z2=az+dz*(i+1)/21,y2=H(x2,z2)+3.9-1.0*Math.sin(Math.PI*(i+1)/21);draw(Tube([x,y-sag,z],[x2,y2,z2],.035,[.04,.05,.06]));}}
    let ph=(now/1100+l.phase)%1, count=l.type==='gondola'?7:11;
    for(let i=0;i<count;i++){let t=(i/count+ph)%1,x=ax+dx*t,z=az+dz*t,y=H(x,z)+3.7;
       if(l.type==='gondola'){draw(BOX,Mul(T(x,y-.18,z),Sc(.62,.42,.62)));draw(BOX,Mul(T(x,y+.22,z),Sc(.08,.55,.08)))}
-      else {draw(BOX,Mul(T(x,y-.22,z),Sc(.46,.10,.18)));draw(BOX,Mul(T(x,y-.02,z),Sc(.05,.45,.05)));}
+      else {draw(BOX,Mul(T(x,y-.22,z),Sc(.46,.10,.18)));draw(BOX,Mul(T(x,y-.02,z),Sc(.05,.45,.05)));draw(BOX,Mul(T(x+.28,y-.05,z),Sc(.035,.5,.035)));draw(BOX,Mul(T(x-.28,y-.05,z),Sc(.035,.5,.035)));}
    }
  } else {
    // magic carpet: low conveyor with repeated moving mats
@@ -73,8 +81,8 @@ for(let l of lifts){
    let ph=(now/700+l.phase)%1;for(let i=0;i<14;i++){let t=(i/14+ph)%1,x=ax+dx*t,z=az+dz*t,y=H(x,z)+.67;draw(BOX,Mul(T(x,y,z),Sc(.18,.04,.30)))}
  }
 }
-for(let i=0;i<100;i++){let x=(i*17.31%54)-27,z=(i*29.17%54)-27;if(Math.hypot(x,z)<10)continue;let y=H(x,z);draw(BOX,Mul(T(x,y+.8,z),Sc(.3,1.6,.3)));draw(BOX,Mul(T(x,y+2.0,z),Sc(1.15,1.8,1.15)))}
-for(let q of guests){let p=pistes[q.p],a=p.p[Math.min(p.p.length-2,Math.floor(q.t*(p.p.length-1)))],b=p.p[Math.min(p.p.length-1,Math.floor(q.t*(p.p.length-1))+1)],t=q.t*(p.p.length-1)%1,x=a[0]+(b[0]-a[0])*t,z=a[2]+(b[2]-a[2])*t,y=H(x,z)+.65;draw(BOX,Mul(T(x,y,z),Sc(.28,.7,.28)))}
+for(let i=0;i<85;i++){let x=(i*17.31%54)-27,z=(i*29.17%54)-27;if(Math.hypot(x,z)<11)continue;for(let [m,M] of tree(x,z,.65+(i%3)*.12))draw(m,M)}
+for(let q of guests){let p=pistes[q.p],a=p.p[Math.min(p.p.length-2,Math.floor(q.t*(p.p.length-1)))],b=p.p[Math.min(p.p.length-1,Math.floor(q.t*(p.p.length-1))+1)],t=q.t*(p.p.length-1)%1,x=a[0]+(b[0]-a[0])*t,z=a[2]+(b[2]-a[2])*t,ang=Math.atan2(b[2]-a[2],b[0]-a[0]);for(let [m,M] of skier(x,z,ang,.9))draw(m,M)}
 for(let q of drawPts)draw(BOX,Mul(T(q[0],H(q[0],q[1])+.8,q[1]),Sc(.3,.3,.3)));ui();requestAnimationFrame(frame)}requestAnimationFrame(frame);
 
 /* v0.2 additions: local sandbox save/load + PWA offline support */
