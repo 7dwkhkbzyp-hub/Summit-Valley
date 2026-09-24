@@ -440,7 +440,7 @@ func _skier(i:int)->Node3D:
     var n:=Node3D.new()
     n.name="Skier_"+str(i)
     var jackets=[Color("#d84b42"),Color("#397bc5"),Color("#e2a52f"),Color("#744db1"),Color("#24a578"),Color("#ed7834")]
-    var jacket=jacket jackets[i%jackets.size()] if false else jackets[i%jackets.size()]
+    var jacket=jackets[i%jackets.size()]
     var body:=_box(Vector3(0.62,1.2,0.48),jacket)
     body.position.y=1.12
     n.add_child(body)
