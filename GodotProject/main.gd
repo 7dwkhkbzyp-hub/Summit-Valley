@@ -196,9 +196,10 @@ func _build_initial_resort() -> void:
     _piste([Vector3(31,terrain_height(31,-43)+0.4,-43),Vector3(35,49,-30),Vector3(27,40,-19),Vector3(20,32,-8),Vector3(12,25,3),Vector3(20,terrain_height(20,-5)+0.4,-5)],"RED")
     _piste([Vector3(40,terrain_height(40,-46)+0.4,-46),Vector3(45,55,-28),Vector3(38,46,-12),Vector3(31,38,2),Vector3(25,31,10),Vector3(20,terrain_height(20,-5)+0.4,-5)],"BLACK")
 
-    _lift(Vector3(-8,terrain_height(-8,24)+2.5,24),Vector3(-20,terrain_height(-20,-42)+2.5,-42),"HIGH-SPEED QUAD")
+    _lift(Vector3(-8,terrain_height(-8,24)+2.5,24),Vector3(-20,terrain_height(-20,-42)+2.5,-42),"CHAIRLIFT")
     _lift(Vector3(20,terrain_height(20,-5)+2.5,-5),Vector3(31,terrain_height(31,-43)+2.5,-43),"GONDOLA")
-    _lift(Vector3(1,terrain_height(1,16)+2.5,18),Vector3(27,terrain_height(27,-20)+2.5,-20),"DETACHABLE SIX")
+    _lift(Vector3(1,terrain_height(1,16)+2.5,18),Vector3(27,terrain_height(27,-20)+2.5,-20),"T-BAR")
+    _lift(Vector3(8,terrain_height(8,27)+1.5,27),Vector3(8,terrain_height(8,8)+1.5,8),"MAGIC CARPET")
 
     _piste([Vector3(-72,terrain_height(-72,-82)+0.4,-82),Vector3(-58,50,-60),Vector3(-48,42,-36),Vector3(-34,31,-10),Vector3(-8,terrain_height(-8,24)+0.4,24)],"GREEN")
     _piste([Vector3(62,terrain_height(62,-82)+0.4,-82),Vector3(68,54,-58),Vector3(57,46,-30),Vector3(43,35,-5),Vector3(20,terrain_height(20,-5)+0.4,-5)],"BLUE")
@@ -302,6 +303,11 @@ func _lift(a:Vector3,b:Vector3,type_name:String)->void:
             var glass:=_box(Vector3(2.45,1.05,0.12),Color("#72b9d7"))
             glass.position=Vector3(0,-2.8,-1.1)
             carrier.add_child(glass)
+        elif type_name.find("T-BAR")>=0:
+            carrier.add_child(_beam(Vector3(0,0,0),Vector3(0,-2.2,0),0.07,Color("#303438")))
+            var tbar:=_box(Vector3(2.2,0.18,0.3),Color("#d34b43"))
+            tbar.position.y=-2.2
+            carrier.add_child(tbar)
         else:
             var seat:=_box(Vector3(2.6,0.22,1.0),Color("#b72e34"))
             seat.position.y=-2.15
