@@ -297,14 +297,19 @@ func _set_mode(m: String) -> void:
         toast_label.text="SUMMIT VALLEY — Godot rebuild"
 
 func _unhandled_input(event: InputEvent) -> void:
-    if event.is_action_pressed("build_mode"):
-        _set_mode("BUILD")
-    elif event.is_action_pressed("piste_mode"):
-        _set_mode("PISTE")
-    elif event.is_action_pressed("lift_mode"):
-        _set_mode("LIFT")
-    elif event.is_action_pressed("pause_game"):
-        paused=!paused
+    if event is InputEventKey and event.pressed and not event.echo:
+        if event.keycode == KEY_B:
+            _set_mode("BUILD")
+            return
+        if event.keycode == KEY_P:
+            _set_mode("PISTE")
+            return
+        if event.keycode == KEY_L:
+            _set_mode("LIFT")
+            return
+        if event.keycode == KEY_SPACE:
+            paused=!paused
+            return
     elif event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:
         if mode=="PISTE":
             painting=true
