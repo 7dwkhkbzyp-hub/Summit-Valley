@@ -5,6 +5,13 @@ const app=new pc.Application(canvas,{graphicsDeviceOptions:{alpha:false,antialia
 app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);app.setCanvasResolution(pc.RESOLUTION_AUTO);
 app.scene.ambientLight=new pc.Color(.30,.39,.52);app.scene.fog.type=pc.FOG_LINEAR;app.scene.fog.start=95;app.scene.fog.end=250;app.scene.fog.color=new pc.Color(.63,.76,.87);
 const sun=new pc.Entity("Alpine Sun");sun.addComponent("light",{type:"directional",color:new pc.Color(1,.94,.82),intensity:3,castShadows:true,shadowDistance:220,shadowResolution:2048});sun.setEulerAngles(43,-34,0);app.root.addChild(sun);app.scene.exposure=1.12;app.start();
+let bootFinished=false;
+const bootWatchdog=setTimeout(()=>{
+ if(!bootFinished){
+   const el=document.getElementById("loadingStatus");
+   if(el)el.textContent="Starting the resort…";
+ }
+},1800);
 
 
 /* External production GLB art pack.
@@ -26,16 +33,26 @@ const GLB={
  snowboardAir:"https://cdn.3dassets.dev/assets/18923/v1/model.glb"
 };
 const glbCache=new Map();
+const glbQueue=[];
+let glbBusy=false;
+function pumpGLBQueue(){
+ if(glbBusy||!glbQueue.length)return;
+ glbBusy=true;
+ const job=glbQueue.shift();
+ const asset=new pc.Asset("Summit production GLB","container",{url:job.url});
+ app.assets.add(asset);
+ asset.on("load",()=>{glbCache.set(job.url,asset);glbBusy=false;job.resolve(asset);setTimeout(pumpGLBQueue,80)});
+ asset.on("error",err=>{glbBusy=false;job.reject(err);setTimeout(pumpGLBQueue,80)});
+ app.assets.load(asset);
+}
 function loadGLB(url){
- if(glbCache.has(url))return glbCache.get(url);
- const p=new Promise((resolve,reject)=>{
-   const asset=new pc.Asset("Summit production GLB","container",{url});
-   app.assets.add(asset);
-   asset.on("load",()=>resolve(asset));
-   asset.on("error",(err)=>reject(err));
-   app.assets.load(asset);
+ if(glbCache.has(url))return Promise.resolve(glbCache.get(url));
+ return new Promise((resolve,reject)=>{
+   glbQueue.push({url,resolve,reject});
+   // Art is deliberately streamed one asset at a time so iPhone Safari never
+   // has to download/decode the whole resort during the initial boot.
+   setTimeout(pumpGLBQueue,250);
  });
- glbCache.set(url,p);return p;
 }
 async function mountGLB(url,parent,scale=1,rotation=[0,0,0]){
  try{
@@ -50,10 +67,14 @@ async function mountGLB(url,parent,scale=1,rotation=[0,0,0]){
  }catch(err){console.warn("GLB failed",url,err);return null}
 }
 async function replaceWithGLB(root,url,scale=1,rotation=[0,0,0]){
- // Hide the procedural fallback first; the imported hierarchy remains fully rendered.
- root.findComponents("render").forEach(r=>r.enabled=false);
+ // Keep the lightweight procedural fallback visible until the real asset is
+ // fully downloaded and decoded. This prevents a half-loaded resort.
  const model=await mountGLB(url,root,scale,rotation);
- if(model)root._productionModel=model;
+ if(model){
+   root.findComponents("render").forEach(r=>{r.enabled=false});
+   model.enabled=true;
+   root._productionModel=model;
+ }
  return model;
 }
 
@@ -64,6 +85,8 @@ const snow=mat("Powder snow",[.82,.89,.96],.98),snowBright=mat("Sunlit snow",[.9
 function entity(n,p,s,pos,m,parent=app.root){const e=new pc.Entity(n);e.addComponent("render",{type:p});e.setLocalScale(s[0],s[1],s[2]);e.setLocalPosition(pos[0],pos[1],pos[2]);e.render.material=m;parent.addChild(e);return e}
 const box=(n,s,p,m,q)=>entity(n,"box",s,p,m,q),sphere=(n,s,p,m,q)=>entity(n,"sphere",s,p,m,q),cyl=(n,s,p,m,q)=>entity(n,"cylinder",s,p,m,q),cone=(n,s,p,m,q)=>entity(n,"cone",s,p,m,q),capsule=(n,s,p,m,q)=>entity(n,"capsule",s,p,m,q);
 
+window.addEventListener("error",e=>{console.error(e.error||e.message);const l=document.getElementById("loadingStatus");if(l)l.textContent="Recovering from a scene error…";if(typeof toast==="function")toast("Game error: "+(e.message||"unknown error"));});
+window.addEventListener("unhandledrejection",e=>{console.error(e.reason);const l=document.getElementById("loadingStatus");if(l)l.textContent="Recovering from an asset error…";});
 const paths=[
 {name:"Meadow Run",color:green,width:5.2,pts:[[-43,37],[-40,31],[-36,25],[-31,18],[-27,12],[-22,6],[-17,0],[-11,-7],[-4,-14],[4,-22],[12,-27]]},
 {name:"Ridge Runner",color:red,width:4.9,pts:[[30,34],[27,28],[24,23],[21,17],[17,11],[14,5],[11,-2],[9,-10],[9,-18],[13,-26]]},
@@ -631,9 +654,6 @@ document.getElementById("weatherBtn").onclick=()=>{weather=(weather+1)%3;const n
 document.getElementById("resetBtn").onclick=()=>{placedBuildings.forEach(b=>b.entity&&b.entity.destroy());placedBuildings.length=0;cash=250000;localStorage.removeItem("summit-valley-save");toast("New season started")};
 window.addEventListener("beforeunload",saveGame);
 
-window.addEventListener("error",e=>{console.error(e.error||e.message);toast("Game error: "+(e.message||"unknown error"));});
-window.addEventListener("unhandledrejection",e=>{console.error(e.reason);toast("Game error — reload the resort");});
-
 
 const camera=new pc.Entity("Camera");camera.addComponent("camera",{clearColor:new pc.Color(.63,.77,.88),fov:46});app.root.addChild(camera);
 let yaw=-31,pitch=32,distance=112,target=new pc.Vec3(0,19,4);
@@ -648,4 +668,4 @@ canvas.addEventListener("pointermove",e=>{if(buildMode){const p=worldPointFromSc
 canvas.addEventListener("pointerup",e=>{if(buildMode){e.preventDefault();draggingBuild=false;const p=worldPointFromScreen(e.clientX,e.clientY);if(buildSelection&&["hotel","chalet","lodge","restaurant","bar","cafe","skiShop","rental","toilet","ticket","parking"].includes(buildSelection.id))placeBuilding(p);else if(buildSelection&&(buildSelection.id.toLowerCase().includes("piste")||["chair","gondola","tbar","magic"].includes(buildSelection.id)))beginRoute(buildSelection.id,p);return}pointers.delete(e.pointerId);lastDist=0});
 canvas.addEventListener("wheel",e=>{distance=Math.max(48,Math.min(160,distance+e.deltaY*.06));updateCamera()},{passive:true});
 window.addEventListener("resize",()=>app.resizeCanvas(canvas.clientWidth,canvas.clientHeight));
-setTimeout(()=>{document.getElementById("loading").style.opacity="0";setTimeout(()=>document.getElementById("loading").remove(),600);toast("Summit Valley — Alpine terrain rebuilt")},1400);
+setTimeout(()=>{bootFinished=true;clearTimeout(bootWatchdog);const loading=document.getElementById("loading");if(loading){loading.style.opacity="0";setTimeout(()=>loading.remove(),450)}toast("Summit Valley — Alpine resort ready")},900);
