@@ -1,0 +1,58 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Summit Valley</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#b9d8ee;font-family:system-ui,-apple-system,sans-serif}canvas{display:block;width:100%;height:100%;touch-action:none}
+#hud{position:absolute;left:12px;top:12px;background:rgba(10,20,28,.88);color:white;padding:12px 14px;border-radius:12px;min-width:250px;font-size:14px;line-height:1.5;box-shadow:0 5px 20px #0004}
+#title{font-weight:800;font-size:18px;letter-spacing:.08em}#toast{position:absolute;top:14px;left:50%;transform:translateX(-50%);background:#10232dcc;color:#fff;padding:9px 15px;border-radius:20px;font-weight:600}
+#bar{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:7px;flex-wrap:wrap;justify-content:center;width:96%;pointer-events:auto}
+button{border:0;border-radius:11px;padding:13px 15px;background:#122632ee;color:#fff;font-weight:700;font-size:14px;box-shadow:0 3px 12px #0004}button.active{background:#e8f2f7;color:#132530}
+#legend{position:absolute;right:12px;top:12px;background:#ffffffd9;padding:10px;border-radius:12px;font-size:12px}
+@media(max-width:600px){#hud{font-size:12px;min-width:205px;padding:8px 10px}#title{font-size:15px}#legend{top:125px;right:8px}button{padding:11px 10px;font-size:12px}}
+</style></head><body>
+<canvas id="game"></canvas><div id="hud"></div><div id="toast">Build your ski resort</div>
+<div id="legend"><b>PISTES</b><br><span style="color:#20a65a">● Green</span><br><span style="color:#1476d4">● Blue</span><br><span style="color:#d52f32">● Red</span><br><span>● Black</span></div>
+<div id="bar"><button data-mode="view">VIEW</button><button data-mode="build">BUILD $25k</button><button data-mode="lift">LIFT $45k</button><button data-mode="piste">PAINT PISTE</button><button id="upgrade">UPGRADE $30k</button><button id="pause">PAUSE</button><button id="save">SAVE</button></div>
+<script>
+const c=document.getElementById('game'),x=c.getContext('2d');let W,H,DPR,mode='view',paused=false,last=performance.now(),money=250000,rep=62,guests=48,cap=90,day=1,hour=9,snow=1.15,weather='SUNNY',selected=null,drag=false,paint=[],toastTimer=0;
+const pistes=[
+ {type:'green',pts:[[-.48,.42],[-.35,.25],[-.20,.12],[-.08,-.02],[.03,-.16],[.08,-.36]]},
+ {type:'blue',pts:[[-.62,.48],[-.52,.25],[-.38,.08],[-.20,-.08],[-.02,-.22],[.14,-.42]]},
+ {type:'red',pts:[[.50,.45],[.43,.25],[.30,.08],[.18,-.06],[.08,-.20],[-.03,-.39]]},
+ {type:'black',pts:[[.66,.43],[.58,.22],[.48,.02],[.34,-.16],[.18,-.31],[-.02,-.42]]}
+];
+let lifts=[
+ {a:[-.05,.39],b:[-.33,-.05],type:'QUAD',phase:0,n:14},
+ {a:[.03,.37],b:[.46,-.02],type:'GONDOLA',phase:.3,n:10},
+ {a:[-.18,-.03],b:[.43,-.31],type:'SIX',phase:.6,n:16}
+];
+let buildings=[{p:[-.06,.47],type:'HOTEL'},{p:[.23,.02],type:'RESTAURANT'},{p:[-.33,.23],type:'RENTAL'},{p:[-.16,.43],type:'SCHOOL'}];
+let skiers=Array.from({length:70},(_,i)=>({route:i%4,t:Math.random(),speed:.018+Math.random()*.028,lane:(Math.random()-.5)*.65,phase:Math.random()*6.28,color:['#e04b43','#347bc5','#e4a62f','#7c50b8','#27a676','#ee7837'][i%6]}));
+function resize(){DPR=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;c.width=W*DPR;c.height=H*DPR;c.style.width=W+'px';c.style.height=H+'px';x.setTransform(DPR,0,0,DPR,0,0)}addEventListener('resize',resize);resize();
+function sx(v){return W/2+v*Math.min(W*.43,H*.39)}function sy(v){return H*.57+v*Math.min(W*.43,H*.39)*.72}function pt(p){return [sx(p[0]),sy(p[1])]}
+function terrain(){x.fillStyle='#cfe4f1';x.fillRect(0,0,W,H);let g=x.createLinearGradient(0,0,0,H);g.addColorStop(0,'#8dbbdc');g.addColorStop(.55,'#d9ebf5');g.addColorStop(1,'#eef5f7');x.fillStyle=g;x.fillRect(0,0,W,H);
+  const peaks=[[-.65,.02,.48,.8],[-.25,-.14,.58,1],[.18,-.08,.62,1.05],[.58,.03,.52,.86]];for(const q of peaks){x.beginPath();let [cx,cy,r,h]=q; x.moveTo(sx(cx-r),sy(cy+.55));x.lineTo(sx(cx),sy(cy-h));x.lineTo(sx(cx+r),sy(cy+.55));x.closePath();x.fillStyle='#edf5f8';x.fill();x.beginPath();x.moveTo(sx(cx),sy(cy-h));x.lineTo(sx(cx+r*.42),sy(cy-h*.43));x.lineTo(sx(cx+r),sy(cy+.55));x.lineTo(sx(cx),sy(cy+.18));x.closePath();x.fillStyle='#b7ccd8';x.fill()}
+  for(let i=0;i<85;i++){let px=((i*73)%200)/100-1,py=((i*37)%105)/100-.15;if(py>.45)continue;let [X,Y]=pt([px,py]);x.fillStyle='#245844';x.beginPath();x.moveTo(X,Y-13);x.lineTo(X-7,Y+8);x.lineTo(X+7,Y+8);x.closePath();x.fill()}
+}
+function pathDraw(points,color,width){x.beginPath();points.forEach((p,i)=>{let [X,Y]=pt(p);i?x.lineTo(X,Y):x.moveTo(X,Y)});x.strokeStyle=color;x.lineWidth=width;x.lineCap='round';x.lineJoin='round';x.stroke()}
+function drawPistes(){const colors={green:'#35bd70',blue:'#3b96ed',red:'#e74b50',black:'#30343a'};for(const r of pistes){pathDraw(r.pts,'#fff',20);pathDraw(r.pts,colors[r.type],15);for(let i=0;i<r.pts.length-1;i++){let a=r.pts[i],b=r.pts[i+1],len=Math.hypot(b[0]-a[0],b[1]-a[1]),n=Math.max(1,Math.floor(len*8));for(let j=0;j<n;j++){let t=(j+.5)/n,p=[a[0]*(1-t)+b[0]*t,a[1]*(1-t)+b[1]*t],s=[-(b[1]-a[1]),b[0]-a[0]],m=Math.hypot(s[0],s[1]);s=[s[0]/m*.07,s[1]/m*.07];pole([p[0]+s[0],p[1]+s[1]],colors[r.type]);pole([p[0]-s[0],p[1]-s[1]],colors[r.type])}}}}
+function pole(p,col){let [X,Y]=pt(p);x.strokeStyle='#eef2f4';x.lineWidth=2;x.beginPath();x.moveTo(X,Y+7);x.lineTo(X,Y-7);x.stroke();x.fillStyle=col;x.fillRect(X,Y-8,5,4)}
+function drawBuildings(){for(const b of buildings){let [X,Y]=pt(b.p);x.fillStyle='#754f3a';x.fillRect(X-18,Y-23,36,25);x.fillStyle='#2e2726';x.beginPath();x.moveTo(X-23,Y-23);x.lineTo(X,Y-38);x.lineTo(X+23,Y-23);x.fill();x.fillStyle='#ffd46c';x.fillRect(X-12,Y-13,7,7);x.fillRect(X+5,Y-13,7,7);x.fillStyle='#263943';x.fillRect(X-4,Y-5,8,7);x.font='bold 9px system-ui';x.fillStyle='#182a33';x.textAlign='center';x.fillText(b.type,X,Y+13)}}
+function drawLifts(t){for(const l of lifts){let a=pt(l.a),b=pt(l.b);x.lineWidth=3;x.strokeStyle='#242a2e';x.beginPath();x.moveTo(a[0],a[1]-42);x.lineTo(b[0],b[1]-42);x.stroke();for(let i=0;i<8;i++){let q=i/7,X=a[0]+(b[0]-a[0])*q,Y=a[1]+(b[1]-a[1])*q-42;x.strokeStyle='#566168';x.lineWidth=4;x.beginPath();x.moveTo(X,Y);x.lineTo(X,Y+35);x.stroke();x.fillStyle='#4b555b';x.fillRect(X-8,Y-2,16,4)}for(let i=0;i<l.n;i++){let q=(i/l.n+(t*.025)+l.phase)%1,X=a[0]+(b[0]-a[0])*q,Y=a[1]+(b[1]-a[1])*q-42;if(l.type==='GONDOLA'){x.fillStyle='#e6edf0';x.fillRect(X-7,Y+4,14,10);x.fillStyle='#75b8d4';x.fillRect(X-6,Y+5,12,5)}else{x.fillStyle='#b72d34';x.fillRect(X-9,Y+6,18,3);x.strokeStyle='#252a2e';x.lineWidth=2;x.beginPath();x.moveTo(X,Y);x.lineTo(X,Y+6);x.stroke()}}}}
+function drawSkiers(t){for(const s of skiers){let r=pistes[s.route%pistes.length],q=s.t,seg=Math.min(r.pts.length-2,Math.floor(q*(r.pts.length-1))),f=q*(r.pts.length-1)-seg,a=r.pts[seg],b=r.pts[seg+1],px=a[0]+(b[0]-a[0])*f,py=a[1]+(b[1]-a[1])*f;let dx=b[0]-a[0],dy=b[1]-a[1],m=Math.hypot(dx,dy),nx=-dy/m,ny=dx/m,w=Math.sin(q*12+s.phase)*.025+s.lane*.08;px+=nx*w;py+=ny*w;let [X,Y]=pt([px,py]);x.fillStyle=s.color;x.beginPath();x.arc(X,Y-5,4,0,7);x.fill();x.strokeStyle='#252b31';x.lineWidth=2;x.beginPath();x.moveTo(X,Y);x.lineTo(X,Y+8);x.stroke();x.strokeStyle='#dfe6ea';x.lineWidth=1;x.beginPath();x.moveTo(X-5,Y-1);x.lineTo(X-8,Y+7);x.moveTo(X+5,Y-1);x.lineTo(X+8,Y+7);x.stroke();x.strokeStyle='#333';x.beginPath();x.moveTo(X-3,Y+8);x.lineTo(X-6,Y+12);x.moveTo(X+3,Y+8);x.lineTo(X+6,Y+12);x.stroke()}}
+function draw(){terrain();drawPistes();drawLifts(performance.now()/1000);drawBuildings();drawSkiers(performance.now()/1000)}
+function update(dt){if(paused)return;hour+=dt*.035;if(hour>=24){hour-=24;day++}if(day%18===0&&Math.random()<.002)weather='SNOW';if(weather==='SNOW')snow=Math.min(2.5,snow+dt*.004);else snow=Math.max(.4,snow-dt*.0007);let demand=Math.min(cap,Math.max(12,cap*(.55+rep/200)*(weather==='SNOW'?.9:1)));guests+=(demand-guests)*dt*.015;money+=guests*(.9+buildings.length*.12)*dt*.08- (buildings.length*1.4+lifts.length*2.5)*dt*.08;rep=Math.max(0,Math.min(100,rep+(snow>.7?.003:-.004)*dt));for(const s of skiers)s.t=(s.t+s.speed*dt)%1}
+function hud(){document.getElementById('hud').innerHTML='<div id="title">SUMMIT VALLEY</div>$'+Math.round(money).toLocaleString()+' &nbsp; • &nbsp; Guests '+Math.round(guests)+'/'+cap+'<br>Reputation '+Math.round(rep)+' &nbsp; • &nbsp; Day '+day+' &nbsp; • &nbsp; '+weather+'<br>Snow '+snow.toFixed(2)+'m &nbsp; • &nbsp; Pistes '+pistes.length+' &nbsp; • &nbsp; Lifts '+lifts.length}
+function worldFromEvent(e){let r=c.getBoundingClientRect();let X=(e.clientX-r.left)/r.width*W,Y=(e.clientY-r.top)/r.height*H;return [(X-W/2)/Math.min(W*.43,H*.39),(Y-H*.57)/(Math.min(W*.43,H*.39)*.72)]}
+function placeBuilding(p){if(money<25000)return say('Need $25,000');money-=25000;buildings.push({p,type:'LODGE'});cap+=15;say('New lodge built — capacity +15')}
+function placeLift(p){if(money<45000)return say('Need $45,000');money-=45000;lifts.push({a:p,b:[p[0]+.32,p[1]-.48],type:'QUAD',phase:Math.random(),n:14});cap+=18;say('New chairlift opened — capacity +18')}
+function say(t){document.getElementById('toast').textContent=t;clearTimeout(toastTimer);toastTimer=setTimeout(()=>document.getElementById('toast').textContent='Build your ski resort',3000)}
+document.querySelectorAll('button[data-mode]').forEach(b=>b.onclick=()=>{mode=b.dataset.mode;document.querySelectorAll('button[data-mode]').forEach(z=>z.classList.remove('active'));b.classList.add('active');say(mode==='piste'?'Drag on the mountain to paint a new BLUE piste':mode==='build'?'Tap the mountain to build a lodge':mode==='lift'?'Tap the mountain to build a chairlift':'Explore the resort')});
+document.getElementById('upgrade').onclick=()=>{if(money<30000)return say('Need $30,000');money-=30000;cap+=25;rep=Math.min(100,rep+4);say('Resort upgraded — capacity +25')};
+document.getElementById('pause').onclick=()=>{paused=!paused;document.getElementById('pause').textContent=paused?'RESUME':'PAUSE'};
+document.getElementById('save').onclick=()=>{try{localStorage.setItem('sv-save',JSON.stringify({money,rep,guests,cap,day,snow,buildings,lifts,pistes}));say('Game saved on this device')}catch(e){say('Save unavailable in this browser')}};
+c.addEventListener('pointerdown',e=>{drag=true;paint=[];let p=worldFromEvent(e);if(mode==='piste')paint.push(p);else if(mode==='build')placeBuilding(p);else if(mode==='lift')placeLift(p)});
+c.addEventListener('pointermove',e=>{if(!drag||mode!=='piste')return;let p=worldFromEvent(e);if(!paint.length||Math.hypot(p[0]-paint[paint.length-1][0],p[1]-paint[paint.length-1][1])>.025)paint.push(p)});
+c.addEventListener('pointerup',()=>{if(mode==='piste'&&paint.length>1){pistes.push({type:'blue',pts:paint.slice(0,25)});say('New BLUE piste opened — skiers will use it');}drag=false;paint=[]});
+try{let s=JSON.parse(localStorage.getItem('sv-save'));if(s){money=s.money||money;rep=s.rep||rep;guests=s.guests||guests;cap=s.cap||cap;day=s.day||day;snow=s.snow||snow;buildings=s.buildings||buildings;lifts=s.lifts||lifts;pistes=s.pistes||pistes}}catch(e){}
+function loop(now){let dt=Math.min(.05,(now-last)/1000);last=now;update(dt);draw();hud();requestAnimationFrame(loop)}requestAnimationFrame(loop);
+</script></body></html>
