@@ -59,6 +59,8 @@ var camera_pitch := -47.0
 var touch_start := Vector2.ZERO
 var last_touch := Vector2.ZERO
 var touch_mode := false
+var lift_type_index := 0
+var lift_types := ["CHAIRLIFT","GONDOLA","T-BAR","MAGIC CARPET"]
 
 var hud: Label
 var info: Label
@@ -253,7 +255,7 @@ func _piste_marker(pos:Vector3,col:Color)->void:
     piste_root.add_child(flag)
 
 func _lift(a:Vector3,b:Vector3,type_name:String)->void:
-    var data={"a":a,"b":b,"type":type_name,"carriers":[],"phase":rng.randf()}
+    var data={"a":a,"b":b,"type":type_name,"carriers":[],"phase":rng.randf(),"queue_count":0}
     lifts.append(data)
     var tower_count:=10
     for i in range(tower_count):
@@ -292,7 +294,7 @@ func _lift(a:Vector3,b:Vector3,type_name:String)->void:
         carrier.rotation.y=atan2((b-a).x,(b-a).z)
         carrier.set_meta("lift_t",t)
         carrier.set_meta("lift_speed",0.012 if type_name.find("GONDOLA")<0 else 0.009)
-        carrier.set_meta("rider",false)
+        carrier.set_meta("rider_node",null)
         if type_name.find("GONDOLA")>=0:
             var cabin:=_box(Vector3(2.8,1.9,2.15),Color("#e3e8ea"))
             cabin.position.y=-2.8
@@ -575,6 +577,9 @@ func _button_action(action:String)->void:
         _save_game()
     elif action=="UPGRADE":
         _upgrade_resort()
+    elif action=="LIFT":
+        lift_type_index=(lift_type_index+1)%lift_types.size()
+        _set_mode("LIFT")
     else:
         _set_mode(action)
 
@@ -595,7 +600,7 @@ func _set_mode(m:String)->void:
     elif mode=="BUILD":
         mode_label.text="BUILD MODE  •  Tap the mountain to build a lodge"
     elif mode=="LIFT":
-        mode_label.text="LIFT MODE  •  Tap to add a chairlift"
+        mode_label.text="LIFT MODE  •  "+lift_types[lift_type_index]+"  •  Tap to place"
     elif mode=="UPGRADE":
         mode_label.text="UPGRADE MODE"
     else:
@@ -733,7 +738,7 @@ func _place_lift(pos:Vector2)->void:
     cash-=45000
     var end=p+Vector3(20,18,-42)
     end.y=terrain_height(end.x,end.z)+2.5
-    _lift(p+Vector3.UP*2.5,end,"CHAIRLIFT")
+    _lift(p+Vector3.UP*2.5,end,lift_types[lift_type_index])
     guest_capacity=min(MAX_GUESTS,guest_capacity+20)
     _toast("New lift opened. Capacity +20.")
 
