@@ -198,7 +198,7 @@ function gableRoof(parent,w,d,h,overhang=1){
   -w/2,-h/2,d/2,  w/2,-h/2,d/2,  0,h/2,d/2
  ];
  const inds=[0,1,2,3,5,4,0,3,4,0,4,1,1,4,5,1,5,2,2,5,3,2,3,0];
- const e=meshEntity("architectural gable roof",verts,inds,roof);root.addChild(e);e.setLocalPosition(0,0,0);return e;
+ const e=meshEntity("architectural gable roof",verts,inds,roof);parent.addChild(e);e.setLocalPosition(0,0,0);return e;
 }
 function windowUnit(parent,x,y,z,w=1.15,h=1.25){
  box("deep window reveal",[w+.18,h+.18,.22],[x,y,z-.06],trunk,parent);
@@ -236,9 +236,9 @@ function createDetailedBuilding(type,x,z,preview=false){
 
  // Proper gable roof: a triangular alpine silhouette rather than two floating slabs.
  const roofEnt=gableRoof(root,cfg.w+1.5,cfg.d+1.0,cfg.h);
- roofEnt.setPosition(0,4.05,0);
+ roofEnt.setLocalPosition(0,4.05,0);
  const snowCap=gableRoof(root,cfg.w+1.65,cfg.d+1.12,cfg.h+.12);
- snowCap.setPosition(0,4.20,0);snowCap.render.material=roofSnow;
+ snowCap.setLocalPosition(0,4.20,0);snowCap.render.material=roofSnow;
 
  // Front glazing and doors.
  const count=Math.max(2,Math.min(6,Math.round(cfg.w/1.45)));
