@@ -459,6 +459,9 @@ func _magic_carpet(a:Vector3,b:Vector3)->void:
 func _lift_station(pos:Vector3,side:String,type_name:String)->void:
     var root:=Node3D.new()
     root.position=pos
+    var wheel_height:=9.0 if type_name.find("CABLE CAR") < 0 else 12.0
+    if type_name.find("GONDOLA") >= 0:
+        wheel_height=10.0
 
     # Full classic terminal: loading platform, machinery housing, roof and bullwheel.
     var platform:=_box(Vector3(16,0.9,9),Color("#59656c"))
@@ -484,11 +487,11 @@ func _lift_station(pos:Vector3,side:String,type_name:String)->void:
 
     # Bullwheel and drive machinery.
     var wheel:=_cylinder(2.45,0.55,Color("#171c20"))
-    wheel.position=Vector3(0,6.9,0)
+    wheel.position=Vector3(0,wheel_height,0)
     wheel.rotation_degrees.x=90
     root.add_child(wheel)
     var hub:=_cylinder(0.55,0.7,Color("#7f898d"))
-    hub.position=Vector3(0,6.9,0)
+    hub.position=Vector3(0,wheel_height,0)
     hub.rotation_degrees.x=90
     root.add_child(hub)
 
@@ -820,8 +823,8 @@ func _update_camera(delta:float=0.016)->void:
     var desired_position=camera_target+desired_offset
     if not camera_smooth_ready:
         camera_visual_target=camera_target
-        camera_visual_yaw=camera_yaw
-        camera_visual_pitch=camera_pitch
+        camera_visual_yaw=deg_to_rad(camera_yaw)
+        camera_visual_pitch=deg_to_rad(camera_pitch)
         camera_visual_distance=camera_distance
         camera.position=desired_position
         camera.look_at(camera_target,Vector3.UP)
