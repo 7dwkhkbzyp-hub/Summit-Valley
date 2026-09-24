@@ -3,10 +3,10 @@ extends Node3D
 # SUMMIT VALLEY — playable mobile ski-resort tycoon
 # Designed as a lightweight Godot 4 Web/mobile prototype with real gameplay loops.
 
-const MAP_SIZE := 300.0
-const GRID := 82
+const MAP_SIZE := 180.0
+const GRID := 56
 const START_CASH := 250000.0
-const MAX_GUESTS := 320
+const MAX_GUESTS := 180
 const PISTE_COLOURS := {
     "GREEN": Color("#43d17b"),
     "BLUE": Color("#3f9cff"),
@@ -53,7 +53,7 @@ var painting := false
 var paint_points := PackedVector3Array()
 var selected_piste := "BLUE"
 var camera_target := Vector3(0, 20, 0)
-var camera_distance := 155.0
+var camera_distance := 115.0
 var camera_yaw := 42.0
 var camera_pitch := -47.0
 var touch_start := Vector2.ZERO
@@ -164,11 +164,11 @@ func _build_mountain() -> void:
 
     # Efficient scenery: shared meshes, not hundreds of independent trees.
     var tree_mesh := _pine_mesh()
-    for i in range(280):
-        var x := rng.randf_range(-138.0,138.0)
-        var z := rng.randf_range(-138.0,138.0)
+    for i in range(115):
+        var x := rng.randf_range(-82.0,82.0)
+        var z := rng.randf_range(-82.0,82.0)
         var y := terrain_height(x,z)
-        if y < 10.0 or y > 62.0:
+        if y < 11.0 or y > 48.0:
             continue
         var tree := MeshInstance3D.new()
         tree.mesh = tree_mesh
@@ -188,25 +188,15 @@ func _build_initial_resort() -> void:
     _building("MOUNTAIN RESTAURANT",Vector3(20,terrain_height(20,-5),-5),32000.0)
     _building("RENTAL CENTRE",Vector3(-25,terrain_height(-25,40),40),22000.0)
     _building("SKI SCHOOL",Vector3(8,terrain_height(8,27),27),18000.0)
-    _building("VALLEY LODGE",Vector3(-55,terrain_height(-55,55),55),42000.0)
-    _building("MID-MOUNTAIN CAFE",Vector3(48,terrain_height(48,28),28),36000.0)
 
     _piste([Vector3(-20,terrain_height(-20,-42)+0.4,-42),Vector3(-16,38,-30),Vector3(-7,31,-16),Vector3(1,24,-2),Vector3(-4,terrain_height(-4,14)+0.4,14),Vector3(-8,terrain_height(-8,24)+0.4,24)],"GREEN")
     _piste([Vector3(-28,terrain_height(-28,-48)+0.4,-48),Vector3(-28,43,-31),Vector3(-20,35,-18),Vector3(-5,27,-3),Vector3(8,22,10),Vector3(1,terrain_height(1,16)+0.4,18)],"BLUE")
     _piste([Vector3(31,terrain_height(31,-43)+0.4,-43),Vector3(35,49,-30),Vector3(27,40,-19),Vector3(20,32,-8),Vector3(12,25,3),Vector3(20,terrain_height(20,-5)+0.4,-5)],"RED")
     _piste([Vector3(40,terrain_height(40,-46)+0.4,-46),Vector3(45,55,-28),Vector3(38,46,-12),Vector3(31,38,2),Vector3(25,31,10),Vector3(20,terrain_height(20,-5)+0.4,-5)],"BLACK")
 
-    _piste([Vector3(-72,terrain_height(-72,-72)+0.5,-72),Vector3(-68,54,-52),Vector3(-58,45,-30),Vector3(-46,36,-5),Vector3(-32,terrain_height(-32,32)+0.5,32)],"GREEN")
-    _piste([Vector3(74,terrain_height(74,-70)+0.5,-70),Vector3(78,58,-45),Vector3(69,48,-18),Vector3(58,39,8),Vector3(48,terrain_height(48,28)+0.5,28)],"BLUE")
-    _piste([Vector3(-82,terrain_height(-82,8)+0.5,8),Vector3(-74,52,18),Vector3(-63,45,34),Vector3(-55,terrain_height(-55,55)+0.5,55)],"RED")
-    _piste([Vector3(88,terrain_height(88,6)+0.5,6),Vector3(82,55,18),Vector3(70,48,30),Vector3(55,41,42),Vector3(38,terrain_height(38,45)+0.5,45)],"BLACK")
-
     _lift(Vector3(-8,terrain_height(-8,24)+2.5,24),Vector3(-20,terrain_height(-20,-42)+2.5,-42),"HIGH-SPEED QUAD")
     _lift(Vector3(20,terrain_height(20,-5)+2.5,-5),Vector3(31,terrain_height(31,-43)+2.5,-43),"GONDOLA")
     _lift(Vector3(1,terrain_height(1,16)+2.5,18),Vector3(27,terrain_height(27,-20)+2.5,-20),"DETACHABLE SIX")
-    _lift(Vector3(-32,terrain_height(-32,32)+2.5,32),Vector3(-72,terrain_height(-72,-72)+2.5,-72),"EXPRESS QUAD")
-    _lift(Vector3(48,terrain_height(48,28)+2.5,28),Vector3(74,terrain_height(74,-70)+2.5,-70),"GONDOLA 2")
-    _lift(Vector3(-55,terrain_height(-55,55)+2.5,55),Vector3(-82,terrain_height(-82,8)+2.5,8),"SIX-PACK")
 
 func _piste(points: Array, difficulty: String) -> void:
     var d = {"points":PackedVector3Array(points),"difficulty":difficulty,"condition":100.0,"open":true,"name":difficulty+" RUN "+str(pistes.size()+1)}
@@ -258,88 +248,58 @@ func _piste_marker(pos:Vector3,col:Color)->void:
 func _lift(a:Vector3,b:Vector3,type_name:String)->void:
     var data={"a":a,"b":b,"type":type_name,"carriers":[],"phase":rng.randf()}
     lifts.append(data)
-
-    var tower_count:=12
-    var cable_height:=9.5
-    var lateral:=2.15
-    var span_dir:Vector3=(b-a).normalized()
-    var side_dir:Vector3=span_dir.cross(Vector3.UP).normalized()
-
+    var tower_count:=10
     for i in range(tower_count):
         var t=float(i)/float(tower_count-1)
         var p=a.lerp(b,t)
-        var h:=10.0
-        var tower:=_box(Vector3(0.8,h,0.8),Color("#69757b"))
+        var h:=9.0
+        var tower:=_box(Vector3(0.72,h,0.72),Color("#68747b"))
         tower.position=p+Vector3.UP*h*0.5
         lift_root.add_child(tower)
-
-        var cross:=_box(Vector3(6.4,0.34,0.55),Color("#454f55"))
+        var cross:=_box(Vector3(5.4,0.28,0.45),Color("#4d565d"))
         cross.position=p+Vector3.UP*h
-        cross.rotation.y=atan2((b-a).x,(b-a).z)
         lift_root.add_child(cross)
-
-        for run in [-1.0,1.0]:
-            var sheave:=_cylinder(0.43,0.22,Color("#1b2024"))
-            sheave.position=p+Vector3.UP*(h-0.28)+side_dir*(run*lateral)
+        for sx in [-2.0,2.0]:
+            var sheave:=_cylinder(0.36,0.18,Color("#1f2327"))
+            sheave.position=p+Vector3(sx,h-0.3,0)
             sheave.rotation_degrees.x=90
-            sheave.rotation_degrees.y=rad_to_deg(atan2(span_dir.x,span_dir.z))
             lift_root.add_child(sheave)
 
-    # Continuous cable loops. Carriers use the exact same curve as the cable.
     for run in [-1.0,1.0]:
-        for i in range(tower_count-1):
-            var t0=float(i)/float(tower_count-1)
-            var t1=float(i+1)/float(tower_count-1)
-            var p0=a.lerp(b,t0)+Vector3.UP*cable_height-Vector3.UP*(sin(t0*PI)*2.2)+side_dir*(run*lateral)
-            var p1=a.lerp(b,t1)+Vector3.UP*cable_height-Vector3.UP*(sin(t1*PI)*2.2)+side_dir*(run*lateral)
-            lift_root.add_child(_beam(p0,p1,0.105,Color("#1c2226")))
+        for i in range(18):
+            var t0=float(i)/18.0
+            var t1=float(i+1)/18.0
+            var p0=a.lerp(b,t0)+Vector3(run*2.0,9.0-sin(t0*PI)*2.8,0)
+            var p1=a.lerp(b,t1)+Vector3(run*2.0,9.0-sin(t1*PI)*2.8,0)
+            lift_root.add_child(_beam(p0,p1,0.09,Color("#20252a")))
 
     _lift_station(a,"BOTTOM",type_name)
     _lift_station(b,"TOP",type_name)
 
-    var count:=18 if type_name.find("GONDOLA")<0 else 12
-    for run in [-1.0,1.0]:
-        for i in range(count):
-            var carrier:=Node3D.new()
-            var t=float(i)/float(count)
-            carrier.position=_lift_cable_position(data,t,run)
-            carrier.set_meta("lift_t",t)
-            carrier.set_meta("lift_speed",0.0105 if type_name.find("GONDOLA")<0 else 0.0085)
-            carrier.set_meta("lift_run",run)
-            carrier.set_meta("has_rider",false)
-
-            # Hanger reaches the cable, so the chair/cabin is visibly suspended from it.
-            var hanger:=_beam(Vector3(0,0,0),Vector3(0,-2.5,0),0.075,Color("#252b30"))
-            carrier.add_child(hanger)
-            if type_name.find("GONDOLA")>=0:
-                var cabin:=_box(Vector3(3.0,2.0,2.3),Color("#e3e8ea"))
-                cabin.position.y=-3.5
-                carrier.add_child(cabin)
-                var glass_front:=_box(Vector3(2.5,1.1,0.10),Color("#65a9c4"))
-                glass_front.position=Vector3(0,-3.5,-1.17)
-                carrier.add_child(glass_front)
-                var glass_back:=_box(Vector3(2.5,1.1,0.10),Color("#65a9c4"))
-                glass_back.position=Vector3(0,-3.5,1.17)
-                carrier.add_child(glass_back)
-            else:
-                var seat:=_box(Vector3(3.0,0.24,1.05),Color("#b62f36"))
-                seat.position.y=-2.75
-                carrier.add_child(seat)
-                var back:=_box(Vector3(3.0,1.0,0.18),Color("#8e252b"))
-                back.position=Vector3(0,-2.25,0.38)
-                carrier.add_child(back)
-                var safety:=_beam(Vector3(-1.0,-2.18,-0.45),Vector3(1.0,-2.18,-0.45),0.045,Color("#d2d6d8"))
-                carrier.add_child(safety)
-            lift_root.add_child(carrier)
-            data["carriers"].append(carrier)
-
-func _lift_cable_position(data:Dictionary,t:float,run:float)->Vector3:
-    var a:Vector3=data["a"]
-    var b:Vector3=data["b"]
-    var span:Vector3=(b-a).normalized()
-    var side:Vector3=span.cross(Vector3.UP).normalized()
-    var y:=9.5-sin(t*PI)*2.2
-    return a.lerp(b,t)+Vector3.UP*y+side*(run*2.15)
+    var count:=14 if type_name.find("GONDOLA")<0 else 10
+    for i in range(count):
+        var carrier:=Node3D.new()
+        var t=float(i)/float(count)
+        carrier.position=a.lerp(b,t)+Vector3.UP*(8.7-sin(t*PI)*2.8)
+        carrier.set_meta("lift_t",t)
+        carrier.set_meta("lift_speed",0.012 if type_name.find("GONDOLA")<0 else 0.009)
+        if type_name.find("GONDOLA")>=0:
+            var cabin:=_box(Vector3(2.8,1.9,2.15),Color("#e3e8ea"))
+            cabin.position.y=-2.8
+            carrier.add_child(cabin)
+            var glass:=_box(Vector3(2.45,1.05,0.12),Color("#72b9d7"))
+            glass.position=Vector3(0,-2.8,-1.1)
+            carrier.add_child(glass)
+        else:
+            var seat:=_box(Vector3(2.6,0.22,1.0),Color("#b72e34"))
+            seat.position.y=-2.15
+            carrier.add_child(seat)
+            var back:=_box(Vector3(2.6,1.0,0.18),Color("#8f252b"))
+            back.position=Vector3(0,-1.65,0.35)
+            carrier.add_child(back)
+            carrier.add_child(_beam(Vector3(0,-0.1,0),Vector3(0,-2.0,0),0.07,Color("#303438")))
+        lift_root.add_child(carrier)
+        data["carriers"].append(carrier)
 
 func _lift_station(pos:Vector3,side:String,type_name:String)->void:
     var root:=Node3D.new()
@@ -373,139 +333,69 @@ func _spawn_guest(i:int)->void:
     if pistes.is_empty(): return
     var n:=_skier(i)
     var route:=rng.randi_range(0,pistes.size()-1)
-    var g={
-        "node":n,
-        "route":route,
-        "t":rng.randf_range(0.0,0.35),
-        "speed":rng.randf_range(0.020,0.042),
-        "lane":rng.randf_range(-2.4,2.4),
-        "phase":rng.randf_range(0.0,TAU),
-        "state":"ski",
-        "lift":-1,
-        "carrier":null
-    }
+    var g={"node":n,"route":route,"t":rng.randf(),"speed":rng.randf_range(0.015,0.032),"lane":rng.randf_range(-2.8,2.8),"phase":rng.randf_range(0.0,TAU)}
     guests.append(g)
     guest_root.add_child(n)
 
-func _nearest_lift_to_point(p:Vector3)->int:
-    var best:=-1
-    var best_dist:=INF
-    for i in range(lifts.size()):
-        var d:Dictionary=lifts[i]
-        var dist:=p.distance_to(d["a"])
-        if dist<best_dist:
-            best_dist=dist
-            best=i
-    return best if best_dist<42.0 else -1
-
-func _nearest_carrier_at_bottom(lift_index:int)->Node3D:
-    if lift_index<0 or lift_index>=lifts.size(): return null
-    var d:Dictionary=lifts[lift_index]
-    var best:Node3D=null
-    var best_dist:=INF
-    for c in d["carriers"]:
-        if bool(c.get_meta("has_rider")): continue
-        var t=float(c.get_meta("lift_t"))
-        var dist:=min(t,1.0-t)
-        if t<0.12 and dist<best_dist:
-            best=c
-            best_dist=dist
-    return best
-
-func _route_from_lift_top(lift_index:int)->int:
-    if lift_index<0:return -1
-    var top:Vector3=lifts[lift_index]["b"]
-    var best:=-1
-    var best_dist:=INF
-    for i in range(pistes.size()):
-        var pts:PackedVector3Array=pistes[i]["points"]
-        if pts.size()==0:continue
-        var d:=top.distance_to(pts[pts.size()-1])
-        if d<best_dist:
-            best_dist=d
-            best=i
-    return best if best_dist<52.0 else -1
+func _skier(i:int)->Node3D:
+    var n:=Node3D.new()
+    n.name="Skier_"+str(i)
+    var jackets=[Color("#d84b42"),Color("#397bc5"),Color("#e2a52f"),Color("#744db1"),Color("#24a578"),Color("#ed7834")]
+    var jacket=jackets[i%jackets.size()]
+    var body:=_box(Vector3(0.62,1.2,0.48),jacket)
+    body.name="Body"
+    body.position.y=1.12
+    n.add_child(body)
+    var head:=_sphere(0.39,Color("#efc5a5"))
+    head.position.y=2.02
+    n.add_child(head)
+    var helmet:=_sphere(0.44,Color("#20262b"))
+    helmet.scale=Vector3(1,0.64,1)
+    helmet.position.y=2.28
+    n.add_child(helmet)
+    var goggles:=_box(Vector3(0.43,0.13,0.10),Color("#73c8dc"))
+    goggles.position=Vector3(0,2.07,-0.34)
+    n.add_child(goggles)
+    var pants:=_box(Vector3(0.68,0.72,0.5),Color("#252b33"))
+    pants.position.y=0.42
+    n.add_child(pants)
+    for s in [-1.0,1.0]:
+        var ski:=_box(Vector3(0.10,0.07,2.15),Color("#f4f6f7"))
+        ski.position=Vector3(s*0.22,0.10,0)
+        n.add_child(ski)
+        var boot:=_box(Vector3(0.20,0.22,0.45),Color("#15191d"))
+        boot.position=Vector3(s*0.22,0.22,-0.18)
+        n.add_child(boot)
+        n.add_child(_beam(Vector3(s*0.38,1.05,-0.05),Vector3(s*0.50,0.05,-0.65),0.025,Color("#30363b")))
+    n.add_child(_beam(Vector3(-0.32,1.55,0),Vector3(-0.58,1.0,-0.15),0.09,jacket))
+    n.add_child(_beam(Vector3(0.32,1.55,0),Vector3(0.58,1.0,-0.15),0.09,jacket))
+    return n
 
 func _animate_guests(dt:float)->void:
     if pistes.is_empty(): return
     for g in guests:
-        var n:Node3D=g["node"]
-        if not is_instance_valid(n): continue
+        g["t"]=fmod(g["t"]+g["speed"]*dt,1.0)
+        var pts:PackedVector3Array=pistes[g["route"]]["points"]
+        var seg=max(1,pts.size()-1)
+        var f=g["t"]*seg
+        var idx=min(int(f),seg-1)
+        var lt=f-idx
+        var p=pts[idx].lerp(pts[idx+1],lt)
+        var tangent=(pts[idx+1]-pts[idx]).normalized()
+        var side=tangent.cross(Vector3.UP).normalized()
+        p+=side*(g["lane"]+sin(g["t"]*TAU*2.0+g["phase"])*0.65)
+        p.y+=0.25
+        g["node"].position=p
+        g["node"].rotation.y=atan2(tangent.x,tangent.z)
+        g["node"].rotation.z=sin(g["t"]*TAU*3.0+g["phase"])*0.12
 
-        if g["state"]=="ski":
-            var pts:PackedVector3Array=pistes[g["route"]]["points"]
-            if pts.size()<2: continue
-            var seg:=pts.size()-1
-            g["t"]+=g["speed"]*dt
-            if g["t"]>=1.0:
-                var bottom:Vector3=pts[0]
-                var li:=_nearest_lift_to_point(bottom)
-                if li>=0:
-                    g["lift"]=li
-                    g["state"]="queue"
-                    g["carrier"]=null
-                    n.rotation_degrees=Vector3.ZERO
-                else:
-                    g["t"]=0.0
-                continue
-
-            # Travel from the last/high point down to the first/low point.
-            var progress:=1.0-g["t"]
-            var f:=progress*seg
-            var idx:=min(int(f),seg-1)
-            var lt:=f-idx
-            var p:=pts[idx].lerp(pts[idx+1],lt)
-            var tangent:Vector3=(pts[idx+1]-pts[idx]).normalized()
-            var side:Vector3=tangent.cross(Vector3.UP).normalized()
-            p+=side*(g["lane"]+sin(g["t"]*TAU*2.0+g["phase"])*0.55)
-            p.y=terrain_height(p.x,p.z)+0.75
-            n.position=p
-            n.rotation.y=atan2(tangent.x,tangent.z)
-            n.rotation.z=sin(g["t"]*TAU*3.0+g["phase"])*0.10
-
-        elif g["state"]=="queue":
-            var li:int=g["lift"]
-            if li<0 or li>=lifts.size():
-                g["state"]="ski"
-                g["t"]=0.0
-                continue
-            var d:Dictionary=lifts[li]
-            var bottom:Vector3=d["a"]
-            var q_index:=int(abs(g["phase"])*10.0)%5
-            var span:Vector3=(d["b"]-d["a"]).normalized()
-            var side:Vector3=span.cross(Vector3.UP).normalized()
-            n.position=bottom+side*((q_index-2)*1.7)+Vector3(0,0.8,4.5)
-            n.rotation.y=atan2(span.x,span.z)
-            var carrier:=_nearest_carrier_at_bottom(li)
-            if carrier!=null:
-                g["carrier"]=carrier
-                g["state"]="lift"
-                carrier.set_meta("has_rider",true)
-
-        elif g["state"]=="lift":
-            var carrier:Node3D=g["carrier"]
-            if not is_instance_valid(carrier):
-                g["state"]="queue"
-                g["carrier"]=null
-                continue
-            var ct:float=carrier.get_meta("lift_t")
-            var li:int=g["lift"]
-            var d:Dictionary=lifts[li]
-            n.global_position=carrier.global_position+Vector3(0,-3.25,0)
-            n.rotation.y=atan2((d["b"]-d["a"]).x,(d["b"]-d["a"]).z)
-            if ct>0.965:
-                carrier.set_meta("has_rider",false)
-                var next_route:=_route_from_lift_top(li)
-                if next_route>=0:
-                    g["route"]=next_route
-                    g["t"]=0.0
-                    g["state"]="ski"
-                    g["carrier"]=null
-                    n.global_position=pistes[next_route]["points"][-1]+Vector3.UP*0.75
-                else:
-                    g["state"]="ski"
-                    g["t"]=0.0
-                    g["carrier"]=null
+func _animate_lifts(dt:float)->void:
+    for data in lifts:
+        for carrier in data["carriers"]:
+            var t=float(carrier.get_meta("lift_t"))
+            t=fmod(t+float(carrier.get_meta("lift_speed"))*dt,1.0)
+            carrier.set_meta("lift_t",t)
+            carrier.position=data["a"].lerp(data["b"],t)+Vector3.UP*(8.7-sin(t*PI)*2.8)
 
 func _economy_tick()->void:
     var open_pistes:=0
@@ -707,10 +597,10 @@ func _unhandled_input(event:InputEvent)->void:
         if p!=Vector3.INF and (paint_points.is_empty() or paint_points[-1].distance_to(p)>2.2):
             paint_points.append(p+Vector3.UP*0.4)
     elif event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_WHEEL_UP:
-        camera_distance=clamp(camera_distance-7.0,65.0,235.0)
+        camera_distance=clamp(camera_distance-7.0,55.0,160.0)
         _update_camera()
     elif event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_WHEEL_DOWN:
-        camera_distance=clamp(camera_distance+7.0,65.0,235.0)
+        camera_distance=clamp(camera_distance+7.0,55.0,160.0)
         _update_camera()
 
 func _focus_ground(pos:Vector2)->void:
@@ -755,14 +645,14 @@ func _place_building(pos:Vector2)->void:
 func _place_lift(pos:Vector2)->void:
     var p=_screen_ground(pos)
     if p==Vector3.INF or cash<45000:
-        _toast("An express chairlift costs $65,000.")
+        _toast("A chairlift costs $45,000.")
         return
-    cash-=65000
-    var end=p+Vector3(32,28,-58)
+    cash-=45000
+    var end=p+Vector3(20,18,-42)
     end.y=terrain_height(end.x,end.z)+2.5
-    _lift(p+Vector3.UP*2.5,end,"EXPRESS QUAD")
-    guest_capacity=min(MAX_GUESTS,guest_capacity+25)
-    _toast("New express quad opened. Capacity +25.")
+    _lift(p+Vector3.UP*2.5,end,"CHAIRLIFT")
+    guest_capacity=min(MAX_GUESTS,guest_capacity+20)
+    _toast("New lift opened. Capacity +20.")
 
 func _building(title:String,pos:Vector3,cost:float)->void:
     buildings.append({"name":title,"pos":pos,"cost":cost})
