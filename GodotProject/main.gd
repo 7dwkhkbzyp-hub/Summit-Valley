@@ -261,6 +261,7 @@ func _animate_guests(delta: float) -> void:
 
 func _ui() -> void:
     var layer:=CanvasLayer.new()
+    layer.name="HUD"
     add_child(layer)
     var panel:=ColorRect.new()
     panel.color=Color(0.03,0.05,0.07,0.84)
