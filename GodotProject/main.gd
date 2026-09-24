@@ -509,6 +509,23 @@ func _animate_guests(dt:float)->void:
                     g["t"]=0.0
                     g["carrier"]=null
 
+func _animate_lifts(dt:float)->void:
+    # Move every chair/cabin along the exact cable path used to place it.
+    for d in lifts:
+        var carriers:Array=d["carriers"]
+        var speed_base:=0.0105 if str(d["type"]).find("GONDOLA")<0 else 0.0085
+        for carrier in carriers:
+            if not is_instance_valid(carrier):
+                continue
+            var t:=float(carrier.get_meta("lift_t"))
+            var run:=float(carrier.get_meta("lift_run"))
+            var speed:=float(carrier.get_meta("lift_speed",speed_base))
+            t+=speed*dt
+            if t>1.0:
+                t-=1.0
+            carrier.set_meta("lift_t",t)
+            carrier.position=_lift_cable_position(d,t,run)
+
 func _economy_tick()->void:
     var open_pistes:=0
     var condition:=0.0
