@@ -117,6 +117,8 @@ function makeSkier(i,route,t,type){
  // Arms are angled forward like a real skier rather than hanging straight down.
  const a1=capsule("arm",[.12,.42,.12],[-.33,1.18,.08],jm,e);a1.setLocalEulerAngles(0,0,-30);
  const a2=capsule("arm",[.12,.42,.12],[.33,1.18,.08],jm,e);a2.setLocalEulerAngles(0,0,30);
+ const pole1=cyl("pole",[.028,.82,.028],[-.38,.68,.20],steel,e);pole1.setLocalEulerAngles(12,0,-18);
+ const pole2=cyl("pole",[.028,.82,.028],[.38,.68,.20],steel,e);pole2.setLocalEulerAngles(12,0,18);
  sphere("glove",[.14,.14,.14],[-.48,1.36,.18],glove,e);sphere("glove",[.14,.14,.14],[.48,1.36,.18],glove,e);
  const l1=capsule("leg",[.14,.48,.14],[-.14,.52,.03],pants,e);l1.setLocalEulerAngles(0,0,-9);
  const l2=capsule("leg",[.14,.48,.14],[.14,.52,.03],pants,e);l2.setLocalEulerAngles(0,0,9);
@@ -126,15 +128,13 @@ function makeSkier(i,route,t,type){
    sphere("binding",[.13,.09,.16],[-.25,.17,.02],steel,e);sphere("binding",[.13,.09,.16],[.25,.17,.02],steel,e);
  }else{
    box("ski",[.055,.045,1.45],[-.18,.13,.12],snowBright,e);box("ski",[.055,.045,1.45],[.18,.13,.12],snowBright,e);
-   const p1=cyl("pole",[.028,.82,.028],[-.38,.68,.20],steel,e);p1.setLocalEulerAngles(12,0,-18);
-   const p2=cyl("pole",[.028,.82,.028],[.38,.68,.20],steel,e);p2.setLocalEulerAngles(12,0,18);
  }
- e._route=route;e._path=t;e._speed=.022+Math.random()*.04;e._phase=Math.random()*6;guests.push(e)
+ e._route=route;e._path=t;e._speed=.022+Math.random()*.04;e._phase=Math.random()*6;e._type=type;e._anim={body:e.children[0],head:e.children[1],helmet:e.children[2],goggles:e.children[3],collar:e.children[4],pack:e.children[5],armL:a1,armR:a2,gloveL:e.children[8],gloveR:e.children[9],legL:l1,legR:l2,poleL:pole1,poleR:pole2};guests.push(e)
 }
 for(let i=0;i<44;i++)makeSkier(i,i%paths.length,(i*.173+Math.random()*.22)%1,i%7===0?"snowboarder":"skier");
 function chooseRoute(g){const choices=[0,1,2,3,4].filter(x=>x!==g._route);g._route=choices[Math.floor(Math.random()*choices.length)];g._path=Math.random()*.12;g._speed=.022+Math.random()*.04}
 let cash=250000,paused=false,weather=0;
-app.on("update",dt=>{if(paused)return;const now=performance.now()/1000;guests.forEach(g=>{g._path+=dt*g._speed;if(g._path>=1)chooseRoute(g);const p=samplePath(paths[g._route],g._path),p2=samplePath(paths[g._route],Math.min(.999,g._path+.012)),turn=Math.atan2(p2[0]-p[0],p2[1]-p[1])*180/Math.PI;g.setLocalPosition(p[0],height(p[0],p[1])+.66,p[1]);g.setLocalEulerAngles(0,turn,Math.sin(now*4+g._phase)*4)});[...lift1,...lift2,...lift3].forEach(c=>{const cycle=(c._phase+now*.055)%2,t=cycle<=1?cycle:2-cycle;c.setPosition(pc.math.lerp(c._a[0],c._b[0],t),pc.math.lerp(c._a[1],c._b[1],t),pc.math.lerp(c._a[2],c._b[2],t))});document.getElementById("guests").textContent=String(90+Math.floor((now*2)%120));document.getElementById("cash").textContent=Math.floor(cash).toLocaleString()});
+app.on("update",dt=>{if(paused)return;const now=performance.now()/1000;guests.forEach(g=>{g._path+=dt*g._speed;if(g._path>=1)chooseRoute(g);const p=samplePath(paths[g._route],g._path),p2=samplePath(paths[g._route],Math.min(.999,g._path+.012)),turn=Math.atan2(p2[0]-p[0],p2[1]-p[1])*180/Math.PI;const phase=now*(5.2+g._speed*22)+g._phase, carve=Math.sin(phase), sway=Math.sin(phase*.5);g.setLocalPosition(p[0],height(p[0],p[1])+.04,p[1]);g.setLocalEulerAngles(0,turn,Math.sin(phase*.7)*3.5);if(g._anim){const a=g._anim;const tuck=20+Math.abs(carve)*7;a.body.setLocalEulerAngles(tuck*.32,0,-12+carve*5);a.head.setLocalEulerAngles(tuck*.16,0,-carve*3);a.helmet.setLocalEulerAngles(tuck*.16,0,-carve*3);a.armL.setLocalEulerAngles(0,0,-30+carve*10);a.armR.setLocalEulerAngles(0,0,30+carve*10);a.legL.setLocalEulerAngles(0,0,-9-carve*7);a.legR.setLocalEulerAngles(0,0,9+carve*7);a.poleL.setLocalEulerAngles(12+carve*8,0,-18-carve*6);a.poleR.setLocalEulerAngles(12-carve*8,0,18-carve*6);a.pack.setLocalPosition(0,1.10,-.19+Math.abs(carve)*.015)}});[...lift1,...lift2,...lift3].forEach(c=>{const cycle=(c._phase+now*.055)%2,t=cycle<=1?cycle:2-cycle;c.setPosition(pc.math.lerp(c._a[0],c._b[0],t),pc.math.lerp(c._a[1],c._b[1],t),pc.math.lerp(c._a[2],c._b[2],t))});document.getElementById("guests").textContent=String(90+Math.floor((now*2)%120));document.getElementById("cash").textContent=Math.floor(cash).toLocaleString()});
 
 let tool="select";document.querySelectorAll(".tool").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".tool").forEach(x=>x.classList.remove("active"));b.classList.add("active");tool=b.dataset.tool;toast(tool==="select"?"Select and inspect your resort":"Build mode: "+b.textContent.trim())}));
 function toast(t){const e=document.getElementById("toast");e.textContent=t;e.classList.add("show");clearTimeout(window.__toast);window.__toast=setTimeout(()=>e.classList.remove("show"),1600)}
