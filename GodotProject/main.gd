@@ -289,11 +289,20 @@ func _rock_cluster()->Node3D:
         root.add_child(rock)
     return root
 
+func _snow_cannon(pos:Vector3,rot:float=0.0)->void:
+    var n:=Node3D.new()
+    n.position=pos
+    n.rotation.y=rot
+    n.add_child(_asset_mesh("res://assets/cannon/asset.obj",Vector3(0.9,0.9,0.9)))
+    scenery_root.add_child(n)
+
 func _build_initial_resort() -> void:
     _building("ALPINE GRAND HOTEL",Vector3(-8,terrain_height(-8,24),24),65000.0)
     _building("MOUNTAIN RESTAURANT",Vector3(20,terrain_height(20,-5),-5),32000.0)
     _building("RENTAL CENTRE",Vector3(-25,terrain_height(-25,40),40),22000.0)
     _building("SKI SCHOOL",Vector3(8,terrain_height(8,27),27),18000.0)
+    for p in [Vector3(-13,terrain_height(-13,7)+0.15,7),Vector3(13,terrain_height(13,4)+0.15,4),Vector3(30,terrain_height(30,-20)+0.15,-20),Vector3(-31,terrain_height(-31,-18)+0.15,-18),Vector3(6,terrain_height(6,-18)+0.15,-18),Vector3(-6,terrain_height(-6,-2)+0.15,-2)]:
+        _snow_cannon(p,rng.randf_range(-0.7,0.7))
 
     _piste([Vector3(-20,terrain_height(-20,-42)+0.4,-42),Vector3(-16,38,-30),Vector3(-7,31,-16),Vector3(1,24,-2),Vector3(-4,terrain_height(-4,14)+0.4,14),Vector3(-8,terrain_height(-8,24)+0.4,24)],"GREEN")
     _piste([Vector3(-28,terrain_height(-28,-48)+0.4,-48),Vector3(-28,43,-31),Vector3(-20,35,-18),Vector3(-5,27,-3),Vector3(8,22,10),Vector3(1,terrain_height(1,16)+0.4,18)],"BLUE")
@@ -682,40 +691,52 @@ func _build_ui()->void:
     add_child(layer)
 
     var top:=ColorRect.new()
-    top.color=Color(0.025,0.045,0.065,0.88)
+    top.color=Color("#24145f")
     top.position=Vector2(12,12)
-    top.size=Vector2(430,145)
+    top.size=Vector2(500,128)
     layer.add_child(top)
 
     hud=Label.new()
-    hud.position=Vector2(28,22)
-    hud.add_theme_font_size_override("font_size",19)
+    hud.position=Vector2(28,20)
+    hud.add_theme_font_size_override("font_size",20)
+    hud.modulate=Color.WHITE
     layer.add_child(hud)
 
     info=Label.new()
-    info.position=Vector2(28,170)
+    info.position=Vector2(28,154)
     info.add_theme_font_size_override("font_size",16)
+    info.modulate=Color("#26364a")
     layer.add_child(info)
 
     mode_label=Label.new()
     mode_label.position=Vector2(18,0)
-    mode_label.add_theme_font_size_override("font_size",19)
+    mode_label.add_theme_font_size_override("font_size",17)
+    mode_label.modulate=Color("#24324a")
     layer.add_child(mode_label)
 
     toast=Label.new()
-    toast.position=Vector2(460,24)
-    toast.add_theme_font_size_override("font_size",18)
+    toast.position=Vector2(520,24)
+    toast.add_theme_font_size_override("font_size",17)
+    toast.modulate=Color("#26364a")
     layer.add_child(toast)
 
     controls=HBoxContainer.new()
-    controls.add_theme_constant_override("separation",7)
+    controls.add_theme_constant_override("separation",8)
     layer.add_child(controls)
     var actions=[["VIEW","SELECT"],["BUILD","BUILD"],["PISTE","PISTE"],["LIFT","LIFT"],["UPGRADE","UPGRADE"],["SAVE","SAVE"],["PAUSE","PAUSE"]]
     for a in actions:
         var b:=Button.new()
         b.text=a[0]
-        b.custom_minimum_size=Vector2(104,54)
-        b.add_theme_font_size_override("font_size",16)
+        b.custom_minimum_size=Vector2(104,56)
+        b.add_theme_font_size_override("font_size",15)
+        var sb:=StyleBoxFlat.new()
+        sb.bg_color=Color("#1679c9") if a[0]!="BUILD" else Color("#22c55e")
+        sb.corner_radius_top_left=12
+        sb.corner_radius_top_right=12
+        sb.corner_radius_bottom_left=12
+        sb.corner_radius_bottom_right=12
+        b.add_theme_stylebox_override("normal",sb)
+        b.add_theme_color_override("font_color",Color.WHITE)
         b.pressed.connect(_button_action.bind(a[1]))
         controls.add_child(b)
 
