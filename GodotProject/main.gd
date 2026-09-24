@@ -53,14 +53,15 @@ var painting := false
 var paint_points := PackedVector3Array()
 var selected_piste := "BLUE"
 var camera_target := Vector3(0, 20, 0)
-var camera_distance := 115.0
+var camera_distance := 135.0
 var camera_yaw := 42.0
-var camera_pitch := -47.0
+var camera_pitch := -58.0
 var camera_visual_target := Vector3.ZERO
 var camera_visual_yaw := 42.0
 var camera_visual_pitch := -47.0
 var camera_visual_distance := 115.0
 var camera_smooth_ready := false
+var camera_pan_speed := 0.11
 var touch_start := Vector2.ZERO
 var last_touch := Vector2.ZERO
 var touch_mode := false
@@ -296,32 +297,36 @@ func _lift(a:Vector3,b:Vector3,type_name:String)->void:
         var t=float(i)/float(tower_count-1)
         var p=_lift_cable_pos(data,t,0.0)
         var h:=9.0 if is_chair else (10.0 if is_gondola else 12.0)
-        var tower:=_box(Vector3(0.82,h,0.82),Color("#68747b"))
-        tower.position=p+Vector3.DOWN*0.0+Vector3.UP*(-data["cable_height"]+h*0.5)
-        # Tower legs are planted on the mountain, while the crossarm sits exactly
-        # at the two rope heights.
-        tower.position.y=terrain_height(p.x,p.z)+h*0.5+2.0
-        lift_root.add_child(tower)
-
+        var ground_y:=terrain_height(p.x,p.z)
+        var tower_top:=ground_y+h
+        # Four-legged steel tower rather than a solid box.
+        for leg_side in [-1.0,1.0]:
+            for leg_depth in [-1.0,1.0]:
+                var foot=p+Vector3(leg_side*0.9,0,leg_depth*0.9)
+                var head=p+Vector3(leg_side*0.28,h,leg_depth*0.28)
+                lift_root.add_child(_beam(foot+Vector3.UP*0.25,head,0.16,Color("#68747b")))
         var cross_len:=5.8 if is_chair else (6.8 if is_gondola else 7.6)
-        var cross:=_beam(p-track_side*cross_len*0.5,p+track_side*cross_len*0.5,0.32,Color("#4d565d"))
+        var cross:=_beam(p-track_side*cross_len*0.5+Vector3.UP*h,p+track_side*cross_len*0.5+Vector3.UP*h,0.30,Color("#4d565d"))
         lift_root.add_child(cross)
         for side_sign in [-1.0,1.0]:
-            var sheave_pos=p+track_side*side_sign*2.0
-            var sheave:=_cylinder(0.42 if is_cable_car else 0.36,0.24,Color("#1f2327"))
-            sheave.position=sheave_pos
-            sheave.rotation_degrees.x=90
-            lift_root.add_child(sheave)
+            var sheave_pos=p+track_side*side_sign*2.0+Vector3.UP*h
+            for wheel_offset in [-0.55,0.55]:
+                var sheave:=_cylinder(0.43 if is_cable_car else 0.37,0.26,Color("#1f2327"))
+                sheave.position=sheave_pos+Vector3(0,0,wheel_offset)
+                sheave.rotation_degrees.x=90
+                lift_root.add_child(sheave)
+        var tower_marker:=_box(Vector3(0.9,0.55,0.18),Color("#e7c44c"))
+        tower_marker.position=p+Vector3.UP*(h+0.35)
+        lift_root.add_child(tower_marker)
 
-    # Continuous twin haul ropes. The carrier path below is sampled from the
-    # exact same function, so the wire and vehicles remain matched.
+    # Each haul rope is one continuous 3D tube. The carrier path below is
+    # sampled from the exact same function, so the cars/chairs sit directly
+    # on the wire rather than on a chain of visibly separated segments.
     for run in [-1.0,1.0]:
-        for i in range(36):
-            var t0=float(i)/36.0
-            var t1=float(i+1)/36.0
-            var p0=_lift_cable_pos(data,t0,run)
-            var p1=_lift_cable_pos(data,t1,run)
-            lift_root.add_child(_beam(p0,p1,0.13 if is_cable_car else 0.11,Color("#15191d")))
+        var cable_points:=PackedVector3Array()
+        for i in range(73):
+            cable_points.append(_lift_cable_pos(data,float(i)/72.0,run))
+        lift_root.add_child(_cable_tube(cable_points,0.15 if is_cable_car else 0.12,Color("#11161a")))
 
     _lift_station(a,"BOTTOM",type_name)
     _lift_station(b,"TOP",type_name)
@@ -370,16 +375,20 @@ func _lift(a:Vector3,b:Vector3,type_name:String)->void:
                     door.position=Vector3(0,-2.6,-1.18)
                     carrier.add_child(door)
                 else:
-                    var spreader:=_beam(Vector3(0,-1.35,0),Vector3(0,-1.9,0),0.07,Color("#303438"))
+                    var spreader:=_beam(Vector3(0,-1.35,0),Vector3(0,-1.9,0),0.075,Color("#303438"))
                     carrier.add_child(spreader)
-                    var seat:=_box(Vector3(2.8,0.24,1.05),Color("#b72e34"))
+                    var seat:=_box(Vector3(2.9,0.26,1.08),Color("#b72e34"))
                     seat.position.y=-2.15
                     carrier.add_child(seat)
-                    var back:=_box(Vector3(2.8,1.05,0.18),Color("#8f252b"))
-                    back.position=Vector3(0,-1.65,0.35)
+                    var back:=_box(Vector3(2.9,1.08,0.20),Color("#8f252b"))
+                    back.position=Vector3(0,-1.65,0.38)
                     carrier.add_child(back)
-                    var safety:=_beam(Vector3(-1.15,-1.75,-0.25),Vector3(1.15,-1.75,-0.25),0.055,Color("#d9b64c"))
+                    for x in [-1.2,1.2]:
+                        carrier.add_child(_beam(Vector3(x,-1.9,-0.25),Vector3(x,-2.2,0.15),0.055,Color("#8f252b")))
+                    var safety:=_beam(Vector3(-1.18,-1.72,-0.30),Vector3(1.18,-1.72,-0.30),0.06,Color("#d9b64c"))
                     carrier.add_child(safety)
+                    var footrest:=_beam(Vector3(-1.05,-2.28,-0.42),Vector3(1.05,-2.28,-0.42),0.065,Color("#303438"))
+                    carrier.add_child(footrest)
                 lift_root.add_child(carrier)
                 data["carriers"].append(carrier)
 
@@ -416,6 +425,40 @@ func _cable_car_vehicle(carrier:Node3D)->void:
     var bumper:=_box(Vector3(4.0,0.18,0.28),Color("#20262b"))
     bumper.position=Vector3(0,-5.45,-1.35)
     carrier.add_child(bumper)
+
+func _cable_tube(points:PackedVector3Array,radius:float,color:Color)->MeshInstance3D:
+    var st:=SurfaceTool.new()
+    st.begin(Mesh.PRIMITIVE_TRIANGLES)
+    st.set_material(_mat(color,0.32))
+    var sides:=8
+    for i in range(points.size()):
+        var p:=points[i]
+        var tangent:Vector3
+        if i==0:
+            tangent=(points[1]-points[0]).normalized()
+        elif i==points.size()-1:
+            tangent=(points[i]-points[i-1]).normalized()
+        else:
+            tangent=(points[i+1]-points[i-1]).normalized()
+        var normal:=tangent.cross(Vector3.UP)
+        if normal.length()<0.01:
+            normal=tangent.cross(Vector3.RIGHT)
+        normal=normal.normalized()
+        var binormal:=tangent.cross(normal).normalized()
+        for j in range(sides):
+            var ang=TAU*float(j)/float(sides)
+            st.add_vertex(p+(normal*cos(ang)+binormal*sin(ang))*radius)
+    for i in range(points.size()-1):
+        for j in range(sides):
+            var a=i*sides+j
+            var b=i*sides+((j+1)%sides)
+            var c2=(i+1)*sides+((j+1)%sides)
+            var d=(i+1)*sides+j
+            st.add_index(a);st.add_index(b);st.add_index(c2)
+            st.add_index(a);st.add_index(c2);st.add_index(d)
+    var mesh:=MeshInstance3D.new()
+    mesh.mesh=st.commit()
+    return mesh
 
 func _magic_carpet(a:Vector3,b:Vector3)->void:
     var data={"a":a,"b":b,"type":"MAGIC CARPET","carriers":[]}
@@ -506,6 +549,16 @@ func _lift_station(pos:Vector3,side:String,type_name:String)->void:
     var sign:=_box(Vector3(5.5,1.3,0.3),Color("#20272c"))
     sign.position=Vector3(0,5.2,-4.05)
     root.add_child(sign)
+
+    for x in [-4.8,4.8]:
+        var column:=_beam(Vector3(x,1.0,-3.1),Vector3(x,6.5,-3.1),0.22,Color("#59656c"))
+        root.add_child(column)
+    var station_sign:=Label3D.new()
+    station_sign.text="SUMMIT VALLEY  •  "+side
+    station_sign.font_size=14
+    station_sign.outline_size=5
+    station_sign.position=Vector3(0,7.7,-4.1)
+    root.add_child(station_sign)
 
     var label:=Label3D.new()
     label.text=type_name+" "+side
@@ -772,8 +825,12 @@ func _unhandled_input(event:InputEvent)->void:
                 paint_points.append(p+Vector3.UP*0.4)
         else:
             var diff=event.position-last_touch
-            camera_yaw-=diff.x*0.25
-            camera_pitch=clamp(camera_pitch-diff.y*0.12,-72.0,-28.0)
+            var yaw=deg_to_rad(camera_yaw)
+            var right:=Vector3(cos(yaw),0,-sin(yaw))
+            var forward:=Vector3(sin(yaw),0,cos(yaw))
+            camera_target += (-right*diff.x + forward*diff.y)*camera_pan_speed
+            camera_target.x=clamp(camera_target.x,-65.0,65.0)
+            camera_target.z=clamp(camera_target.z,-65.0,65.0)
             last_touch=event.position
         return
 
@@ -794,6 +851,14 @@ func _unhandled_input(event:InputEvent)->void:
         var p=_screen_ground(event.position)
         if p!=Vector3.INF and (paint_points.is_empty() or paint_points[-1].distance_to(p)>2.2):
             paint_points.append(p+Vector3.UP*0.4)
+    elif event is InputEventMouseMotion and not painting and mode=="SELECT":
+        var diff=event.relative
+        var yaw=deg_to_rad(camera_yaw)
+        var right:=Vector3(cos(yaw),0,-sin(yaw))
+        var forward:=Vector3(sin(yaw),0,cos(yaw))
+        camera_target += (-right*diff.x + forward*diff.y)*0.055
+        camera_target.x=clamp(camera_target.x,-65.0,65.0)
+        camera_target.z=clamp(camera_target.z,-65.0,65.0)
     elif event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_WHEEL_UP:
         camera_distance=clamp(camera_distance-7.0,55.0,160.0)
     elif event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_WHEEL_DOWN:
@@ -817,26 +882,28 @@ func _screen_ground(pos:Vector2)->Vector3:
 
 func _update_camera(delta:float=0.016)->void:
     if not camera:return
+    # Stable overhead resort view: the player pans the map instead of spinning
+    # the whole mountain around, with smooth easing between positions.
+    camera_yaw=42.0
+    camera_pitch=-58.0
+    camera_distance=clamp(camera_distance,110.0,155.0)
     var yaw=deg_to_rad(camera_yaw)
     var pitch=deg_to_rad(camera_pitch)
     var desired_offset=Vector3(cos(pitch)*sin(yaw),-sin(pitch),cos(pitch)*cos(yaw))*camera_distance
     var desired_position=camera_target+desired_offset
     if not camera_smooth_ready:
         camera_visual_target=camera_target
-        camera_visual_yaw=deg_to_rad(camera_yaw)
-        camera_visual_pitch=deg_to_rad(camera_pitch)
+        camera_visual_yaw=yaw
+        camera_visual_pitch=pitch
         camera_visual_distance=camera_distance
         camera.position=desired_position
         camera.look_at(camera_target,Vector3.UP)
         camera_smooth_ready=true
-        camera.set_physics_interpolation_mode(Node.PHYSICS_INTERPOLATION_MODE_OFF)
         return
-    var blend=1.0-exp(-12.0*max(delta,0.001))
+    var blend=1.0-exp(-7.5*max(delta,0.001))
     camera_visual_target=camera_visual_target.lerp(camera_target,blend)
-    camera_visual_yaw=lerp_angle(camera_visual_yaw,deg_to_rad(camera_yaw),blend)
-    camera_visual_pitch=lerp(camera_visual_pitch,deg_to_rad(camera_pitch),blend)
     camera_visual_distance=lerp(camera_visual_distance,camera_distance,blend)
-    var smooth_offset=Vector3(cos(camera_visual_pitch)*sin(camera_visual_yaw),-sin(camera_visual_pitch),cos(camera_visual_pitch)*cos(camera_visual_yaw))*camera_visual_distance
+    var smooth_offset=Vector3(cos(pitch)*sin(yaw),-sin(pitch),cos(pitch)*cos(yaw))*camera_visual_distance
     camera.position=camera_visual_target+smooth_offset
     camera.look_at(camera_visual_target,Vector3.UP)
 
