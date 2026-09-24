@@ -31,7 +31,6 @@ function loadGLB(url){
  const p=new Promise((resolve,reject)=>{
    const asset=new pc.Asset("Summit production GLB","container",{url});
    app.assets.add(asset);
-   asset.ready=asset.ready||(()=>{});
    asset.on("load",()=>resolve(asset));
    asset.on("error",(err)=>reject(err));
    app.assets.load(asset);
@@ -51,11 +50,10 @@ async function mountGLB(url,parent,scale=1,rotation=[0,0,0]){
  }catch(err){console.warn("GLB failed",url,err);return null}
 }
 async function replaceWithGLB(root,url,scale=1,rotation=[0,0,0]){
+ // Hide the procedural fallback first; the imported hierarchy remains fully rendered.
+ root.findComponents("render").forEach(r=>r.enabled=false);
  const model=await mountGLB(url,root,scale,rotation);
- if(model){
-   root.findComponents("render").forEach(r=>{if(r.entity!==model)r.enabled=false});
-   root._productionModel=model;
- }
+ if(model)root._productionModel=model;
  return model;
 }
 
