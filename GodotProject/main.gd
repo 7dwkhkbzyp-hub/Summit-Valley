@@ -947,6 +947,7 @@ func _mat(color:Color,rough:float)->StandardMaterial3D:
     var m:=StandardMaterial3D.new()
     m.albedo_color=color
     m.roughness=rough
+    m.vertex_color_use_as_albedo=true
     if color.a < 0.99:
         m.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
     return m
