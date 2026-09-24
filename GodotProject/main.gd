@@ -41,6 +41,8 @@ var lift_root := Node3D.new()
 var building_root := Node3D.new()
 var guest_root := Node3D.new()
 var scenery_root := Node3D.new()
+var snow_root := Node3D.new()
+var snow_cannons: Array = []
 
 var pistes: Array = []
 var lifts: Array = []
@@ -71,6 +73,7 @@ var controls: HBoxContainer
 func _ready() -> void:
     rng.seed = 73191
     add_child(scenery_root)
+    add_child(snow_root)
     add_child(piste_root)
     add_child(lift_root)
     add_child(building_root)
@@ -108,6 +111,7 @@ func _process(delta: float) -> void:
         _weather_tick()
     _animate_guests(dt)
     _animate_lifts(dt)
+    _animate_snow_cannons(dt)
     _update_sun()
     _update_hud()
 
@@ -118,6 +122,15 @@ func terrain_height(x: float, z: float) -> float:
     var valley = -18.0 * exp(-(x ** 2 / 1500.0 + (z - 15.0) ** 2 / 1900.0))
     var ridges = 5.5 * sin(x * 0.055) * cos(z * 0.045)
     return max(1.5, 7.0 + peak_a + peak_b + peak_c + valley + ridges)
+
+func _mountain_color(h:float)->Color:
+    if h < 12.0:
+        return Color("#b9c9c1")
+    if h < 22.0:
+        return Color("#d8e2e1")
+    if h < 38.0:
+        return Color("#e9f0f2")
+    return Color("#ffffff")
 
 func _setup_environment() -> void:
     world_env = WorldEnvironment.new()
@@ -156,8 +169,12 @@ func _build_mountain() -> void:
             var p10 = Vector3(x1, terrain_height(x1,z0), z0)
             var p01 = Vector3(x0, terrain_height(x0,z1), z1)
             var p11 = Vector3(x1, terrain_height(x1,z1), z1)
-            st.add_vertex(p00); st.add_vertex(p10); st.add_vertex(p01)
-            st.add_vertex(p10); st.add_vertex(p11); st.add_vertex(p01)
+            st.set_color(_mountain_color(p00.y)); st.add_vertex(p00)
+            st.set_color(_mountain_color(p10.y)); st.add_vertex(p10)
+            st.set_color(_mountain_color(p01.y)); st.add_vertex(p01)
+            st.set_color(_mountain_color(p10.y)); st.add_vertex(p10)
+            st.set_color(_mountain_color(p11.y)); st.add_vertex(p11)
+            st.set_color(_mountain_color(p01.y)); st.add_vertex(p01)
     st.generate_normals()
     terrain_mesh = MeshInstance3D.new()
     terrain_mesh.name = "SnowMountain"
@@ -219,11 +236,13 @@ func _render_piste(d: Dictionary) -> void:
     var col: Color = PISTE_COLOURS[d["difficulty"]]
     var st := SurfaceTool.new()
     st.begin(Mesh.PRIMITIVE_TRIANGLES)
-    st.set_material(_mat(col,0.24))
+    st.set_material(_mat(Color(col.r,col.g,col.b,0.30),0.30))
     for i in range(pts.size()-1):
         var a=pts[i]; var b=pts[i+1]
+        a.y=terrain_height(a.x,a.z)+0.48
+        b.y=terrain_height(b.x,b.z)+0.48
         var side=(b-a).cross(Vector3.UP).normalized()
-        var w=4.9 if d["difficulty"] != "BLACK" else 4.2
+        var w=5.2 if d["difficulty"] != "BLACK" else 4.5
         st.add_vertex(a+side*w); st.add_vertex(b+side*w); st.add_vertex(a-side*w)
         st.add_vertex(a-side*w); st.add_vertex(b+side*w); st.add_vertex(b-side*w)
     var mi:=MeshInstance3D.new()
@@ -239,8 +258,23 @@ func _render_piste(d: Dictionary) -> void:
             _piste_marker(a.lerp(b,t)+side*5.7,col)
             _piste_marker(a.lerp(b,t)-side*5.7,col)
 
+    var groom:=SurfaceTool.new()
+    groom.begin(Mesh.PRIMITIVE_TRIANGLES)
+    groom.set_material(_mat(Color("#fbfdff"),0.95))
+    for i in range(pts.size()-1):
+        var ga:=pts[i]; var gb:=pts[i+1]
+        ga.y=terrain_height(ga.x,ga.z)+0.58
+        gb.y=terrain_height(gb.x,gb.z)+0.58
+        var gs:=(gb-ga).cross(Vector3.UP).normalized()
+        var gw:=2.7 if d["difficulty"]!="BLACK" else 2.3
+        groom.add_vertex(ga+gs*gw); groom.add_vertex(gb+gs*gw); groom.add_vertex(ga-gs*gw)
+        groom.add_vertex(ga-gs*gw); groom.add_vertex(gb+gs*gw); groom.add_vertex(gb-gs*gw)
+    var groom_mesh:=MeshInstance3D.new()
+    groom_mesh.mesh=groom.commit()
+    piste_root.add_child(groom_mesh)
+
     var sign:=Label3D.new()
-    sign.text=d["name"]
+    sign.text=d["name"]+"  ↓"
     sign.font_size=24
     sign.outline_size=7
     sign.modulate=col
@@ -322,13 +356,19 @@ func _lift(a:Vector3,b:Vector3,type_name:String)->void:
 func _lift_station(pos:Vector3,side:String,type_name:String)->void:
     var root:=Node3D.new()
     root.position=pos
-    var platform:=_box(Vector3(12,0.8,7),Color("#626e75"))
+    var platform:=_box(Vector3(16,0.8,10),Color("#59666d"))
     platform.position.y=0.5
     root.add_child(platform)
-    var roof:=_box(Vector3(13,0.7,8),Color("#313b42"))
-    roof.position.y=8.4
+    for sx in [-5.2,5.2]:
+        var leg:=_beam(Vector3(sx,0,0),Vector3(sx*0.72,7.2,0),0.32,Color("#47535a"))
+        root.add_child(leg)
+    var roof:=_box(Vector3(17,0.7,11),Color("#29343b"))
+    roof.position.y=8.5
     root.add_child(roof)
-    var glass:=_box(Vector3(10,4.5,5.8),Color("#8dc9df"))
+    var canopy:=_box(Vector3(18,0.35,1.1),Color("#9b5040"))
+    canopy.position=Vector3(0,8.1,5.2)
+    root.add_child(canopy)
+    var glass:=_box(Vector3(11,4.5,6.5),Color("#8dc9df"))
     glass.position.y=4.2
     root.add_child(glass)
     if type_name!="MAGIC CARPET":
@@ -345,7 +385,7 @@ func _lift_station(pos:Vector3,side:String,type_name:String)->void:
             tread.position=Vector3(-4.5+i*1.3,1.17,0)
             root.add_child(tread)
     var label:=Label3D.new()
-    label.text=type_name+" "+side
+    label.text=type_name+"  •  "+side
     label.font_size=20
     label.outline_size=6
     label.position.y=10
@@ -594,7 +634,7 @@ func _build_ui()->void:
     controls=HBoxContainer.new()
     controls.add_theme_constant_override("separation",7)
     layer.add_child(controls)
-    var actions=[["VIEW","SELECT"],["BUILD","BUILD"],["PISTE","PISTE"],["LIFT","LIFT"],["UPGRADE","UPGRADE"],["SAVE","SAVE"],["PAUSE","PAUSE"]]
+    var actions=[["VIEW","SELECT"],["BUILD","BUILD"],["PISTE","PISTE"],["LIFT","LIFT"],["SNOW","SNOW"],["UPGRADE","UPGRADE"],["SAVE","SAVE"],["PAUSE","PAUSE"]]
     for a in actions:
         var b:=Button.new()
         b.text=a[0]
@@ -608,6 +648,8 @@ func _button_action(action:String)->void:
         paused=!paused
     elif action=="SAVE":
         _save_game()
+    elif action=="SNOW":
+        _set_mode("SNOW")
     elif action=="UPGRADE":
         _upgrade_resort()
     elif action=="LIFT":
@@ -634,6 +676,8 @@ func _set_mode(m:String)->void:
         mode_label.text="BUILD MODE  •  Tap the mountain to build a lodge"
     elif mode=="LIFT":
         mode_label.text="LIFT MODE  •  "+lift_types[lift_type_index]+"  •  Tap to place"
+    elif mode=="SNOW":
+        mode_label.text="SNOWMAKING  •  Tap beside a piste to place a snow cannon"
     elif mode=="UPGRADE":
         mode_label.text="UPGRADE MODE"
     else:
@@ -677,6 +721,7 @@ func _unhandled_input(event:InputEvent)->void:
             touch_mode=mode=="PISTE"
             if mode=="BUILD":_place_building(event.position)
             elif mode=="LIFT":_place_lift(event.position)
+            elif mode=="SNOW":_place_snow_cannon(event.position)
             elif mode=="SELECT":_focus_ground(event.position)
         else:
             if touch_mode and paint_points.size()>=2:
@@ -709,6 +754,7 @@ func _unhandled_input(event:InputEvent)->void:
                 if p!=Vector3.INF:paint_points.append(p+Vector3.UP*0.4)
             elif mode=="BUILD":_place_building(event.position)
             elif mode=="LIFT":_place_lift(event.position)
+            elif mode=="SNOW":_place_snow_cannon(event.position)
         elif painting:
             painting=false
             if paint_points.size()>=2:_piste(paint_points,"BLUE")
@@ -752,6 +798,70 @@ func _update_sun()->void:
     var angle=(hour-12.0)*7.5
     sun.rotation_degrees=Vector3(-35,angle,-20)
     sun.light_energy=clamp(1.55-abs(hour-13.0)*0.075,0.2,1.55)
+
+func _build_snow_cannon(pos:Vector3)->void:
+    var root:=Node3D.new()
+    root.position=pos
+    var base:=_cylinder(0.7,0.25,Color("#4b5960"))
+    base.position.y=0.13
+    root.add_child(base)
+    var mast:=_cylinder(0.12,2.0,Color("#7d898f"))
+    mast.position.y=1.15
+    root.add_child(mast)
+    var barrel:=_cylinder(0.23,1.8,Color("#dce2e5"))
+    barrel.rotation_degrees.z=-18
+    barrel.position=Vector3(0,2.1,-0.2)
+    root.add_child(barrel)
+    var nozzle:=_sphere(0.32,Color("#aeb9bf"))
+    nozzle.position=Vector3(0,2.75,-0.48)
+    root.add_child(nozzle)
+    var label:=Label3D.new()
+    label.text="SNOW CANNON"
+    label.font_size=15
+    label.outline_size=5
+    label.position.y=3.5
+    root.add_child(label)
+    snow_root.add_child(root)
+    var flakes:Array=[]
+    for i in range(18):
+        var flake:=_sphere(0.10,Color("#ffffff"))
+        flake.visible=false
+        root.add_child(flake)
+        flakes.append(flake)
+    snow_cannons.append({"node":root,"origin":pos,"flakes":flakes,"phase":rng.randf()*TAU,"snow":0.0})
+
+func _animate_snow_cannons(dt:float)->void:
+    for c in snow_cannons:
+        var root:Node3D=c["node"]
+        var origin:Vector3=c["origin"]
+        var active:=false
+        for p in pistes:
+            for q in p["points"]:
+                if Vector2(q.x-origin.x,q.z-origin.z).length()<20.0:
+                    active=true
+                    break
+            if active: break
+        c["snow"]=clamp(float(c["snow"])+(0.035 if active else -0.01)*dt,0.0,1.0)
+        var flakes:Array=c["flakes"]
+        for i in range(flakes.size()):
+            var f:Node3D=flakes[i]
+            if not active:
+                f.visible=false
+                continue
+            f.visible=true
+            var t=fmod(float(Time.get_ticks_msec())*0.001*0.75+float(i)*0.31+float(c["phase"]),1.0)
+            f.position=Vector3(sin(float(i)*1.7+t*5.0)*4.5,1.8+t*7.0,-t*15.0-1.0)
+        if active and float(c["snow"])>0.3:
+            root.scale.y=1.0+sin(Time.get_ticks_msec()*0.01)*0.02
+
+func _place_snow_cannon(pos:Vector2)->void:
+    var p:=_screen_ground(pos)
+    if p==Vector3.INF or cash<12000:
+        _toast("A snow cannon costs $12,000.")
+        return
+    cash-=12000
+    _build_snow_cannon(p)
+    _toast("Snow cannon installed — snowmaking active on nearby pistes.")
 
 func _place_building(pos:Vector2)->void:
     var p=_screen_ground(pos)
@@ -837,6 +947,8 @@ func _mat(color:Color,rough:float)->StandardMaterial3D:
     var m:=StandardMaterial3D.new()
     m.albedo_color=color
     m.roughness=rough
+    if color.a < 0.99:
+        m.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
     return m
 
 func _box(size:Vector3,color:Color)->MeshInstance3D:
