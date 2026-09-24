@@ -1,9 +1,0 @@
-using UnityEngine;
-namespace SummitValley {
- public class SummitTerrain:MonoBehaviour {
-  public int resolution=121; public float radius=55f; public Color snowColor,rockColor;
-  public float Height(float x,float z){float r=Mathf.Sqrt((x*.92f)*(x*.92f)+z*z);float h=1.2f+27f*Mathf.Clamp01(1f-r/radius);h+=7f*Mathf.Exp(-((x+15)*(x+15)+(z-5)*(z-5))/330f);h+=5f*Mathf.Exp(-((x-16)*(x-16)+(z+12)*(z+12))/260f);h-=5f*Mathf.Exp(-((x+22)*(x+22)+(z+17)*(z+17))/250f);return h+2f*Mathf.Sin(x*.18f)*Mathf.Cos(z*.16f);}
-  public float Slope(float x,float z){const float e=.35f;float dx=Height(x+e,z)-Height(x-e,z),dz=Height(x,z+e)-Height(x,z-e);return Mathf.Atan(Mathf.Sqrt(dx*dx+dz*dz)/(2f*e));}
-  public void Build(){var mf=gameObject.AddComponent<MeshFilter>();var mr=gameObject.AddComponent<MeshRenderer>();var mesh=new Mesh();int n=Mathf.Max(32,resolution);var v=new Vector3[n*n];var c=new Color[n*n];var tr=new int[(n-1)*(n-1)*6];for(int z=0;z<n;z++)for(int x=0;x<n;x++){float wx=Mathf.Lerp(-radius,radius,x/(float)(n-1)),wz=Mathf.Lerp(-radius,radius,z/(float)(n-1));v[z*n+x]=new Vector3(wx,Height(wx,wz),wz);float s=Slope(wx,wz),y=v[z*n+x].y;c[z*n+x]=(y>22||s<.30f)?snowColor:(s>.68f?rockColor:Color.Lerp(rockColor,snowColor,.5f));}int k=0;for(int z=0;z<n-1;z++)for(int x=0;x<n-1;x++){int i=z*n+x;tr[k++]=i;tr[k++]=i+1;tr[k++]=i+n;tr[k++]=i+1;tr[k++]=i+n+1;tr[k++]=i+n;}mesh.vertices=v;mesh.triangles=tr;mesh.colors=c;mesh.RecalculateNormals();mf.sharedMesh=mesh;var m=new Material(Shader.Find("Standard"));m.enableInstancing=true;mr.sharedMaterial=m;mr.shadowCastingMode=UnityEngine.Rendering.ShadowCastingMode.On;mr.receiveShadows=true;}
- }
-}

@@ -1,2 +1,0 @@
-using UnityEngine;
-namespace SummitValley { public class SummitGuest:MonoBehaviour {public int index;float t;void Start(){t=index*.017f;}void Update(){t+=Time.deltaTime*.02f;float q=t%1f;float x=Mathf.Lerp(-18,-8,q),z=Mathf.Lerp(18,-10,q);var tr=FindObjectOfType<SummitTerrain>();transform.position=new Vector3(x,tr.Height(x,z)+.75f,z);}}}

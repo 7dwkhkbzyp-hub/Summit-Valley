@@ -1,21 +1,5 @@
-# Summit Valley — Ski Resort Tycoon
+# Summit Valley
 
-An iPhone-first 3D alpine sandbox development build.
+Ground-up browser-first ski resort tycoon restart. PlayCanvas is the runtime. The target is a recognisable 3D alpine management game for iPhone Safari: mountain terrain, proper piste geometry, working lifts, guests, hotels, bars, cafés and a tycoon interface.
 
-## Current playable systems
-- WebGL2 procedural 3D mountain
-- Snow depth and sunshine/weather changes
-- Persistent 3D piste corridors
-- Automatic green / blue / red / black piste classification from terrain slope
-- Piste construction
-- Chairlift construction with towers and moving chairs
-- Individual simulated skiers
-- Resort buildings and alpine forest
-- Grooming, cash, guests, simulation speed and pause
-- Local save/load
-- PWA/offline cache support
-
-## iPhone
-Open the GitHub Pages URL in Safari and use **Share → Add to Home Screen**.
-
-This repository is the ongoing development source for Summit Valley.
+This is the first visual vertical slice. Future systems are designed to expand this scene into the full sandbox: terrain editing, research, staff, lift networks, pricing, guest needs, weather/snow depth, scenarios and save/load.

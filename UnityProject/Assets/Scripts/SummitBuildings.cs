@@ -1,7 +1,0 @@
-using UnityEngine;
-namespace SummitValley {
- public static class SummitBuildings {
-  public static GameObject Chalet(Vector3 p,float s,SummitTerrain t,string label){p.y=t.Height(p.x,p.z);var g=new GameObject(label);g.transform.position=p;var baseGo=GameObject.CreatePrimitive(PrimitiveType.Cube);baseGo.transform.SetParent(g.transform);baseGo.transform.localPosition=Vector3.up*1.25f*s;baseGo.transform.localScale=new Vector3(5,2.5f,4)*s;baseGo.GetComponent<Renderer>().material=Mat(new Color(.55f,.31f,.17f));var roof=GameObject.CreatePrimitive(PrimitiveType.Cube);roof.transform.SetParent(g.transform);roof.transform.localPosition=Vector3.up*3.45f*s;roof.transform.localScale=new Vector3(6,.35f,4.8f)*s;roof.transform.rotation=Quaternion.Euler(0,0,10);roof.GetComponent<Renderer>().material=Mat(new Color(.10f,.14f,.17f));for(int i=-1;i<=1;i+=2){var w=GameObject.CreatePrimitive(PrimitiveType.Cube);w.transform.SetParent(g.transform);w.transform.localPosition=new Vector3(i*1.35f*s,1.5f*s,-2.04f*s);w.transform.localScale=new Vector3(.85f,.75f,.08f)*s;w.GetComponent<Renderer>().material=Mat(new Color(.25f,.70f,.82f));}return g;}
-  static Material Mat(Color c){var m=new Material(Shader.Find("Standard"));m.color=c;return m;}
- }
-}

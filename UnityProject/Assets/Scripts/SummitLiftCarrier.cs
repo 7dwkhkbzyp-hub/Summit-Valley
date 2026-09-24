@@ -1,2 +1,0 @@
-using UnityEngine;
-namespace SummitValley { public class SummitLiftCarrier:MonoBehaviour {public Vector3 a,b;public float offset;void Update(){float t=(Time.time*.045f+offset)%1f;Vector3 p=Vector3.Lerp(a,b,t);p.y=FindY(p)+4.7f;transform.position=p;}float FindY(Vector3 p)=>FindObjectOfType<SummitTerrain>().Height(p.x,p.z);} }
