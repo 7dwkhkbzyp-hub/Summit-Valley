@@ -222,6 +222,8 @@ func _render_piste(d: Dictionary) -> void:
     st.set_material(_mat(col,0.24))
     for i in range(pts.size()-1):
         var a=pts[i]; var b=pts[i+1]
+        a.y=terrain_height(a.x,a.z)+0.32
+        b.y=terrain_height(b.x,b.z)+0.32
         var side=(b-a).cross(Vector3.UP).normalized()
         var w=4.9 if d["difficulty"] != "BLACK" else 4.2
         st.add_vertex(a+side*w); st.add_vertex(b+side*w); st.add_vertex(a-side*w)
