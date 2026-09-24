@@ -5,8 +5,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#9fc7df;font-family:sy
 </style></head><body><div id="game"></div><div id="cross"></div><div id="hud"></div><div id="toast">SUMMIT VALLEY — 3D RESORT</div><div id="hint">Drag to orbit • Pinch to zoom<br>Build on the mountain</div>
 <div id="tools"><button data-mode="view" class="active">EXPLORE</button><button data-mode="build">LODGE $25K</button><button data-mode="lift">CHAIRLIFT $45K</button><button data-mode="piste">PISTE</button><button id="upgrade">UPGRADE $30K</button><button id="pause">PAUSE</button><button id="save">SAVE</button></div>
 <script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
-import {OrbitControls} from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/controls/OrbitControls.js';
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js/+esm';
+import {OrbitControls} from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/controls/OrbitControls.js/+esm';
 
 const root=document.getElementById('game'), scene=new THREE.Scene();
 scene.background=new THREE.Color(0x9fc8df);scene.fog=new THREE.Fog(0xb9d5e3,150,420);
