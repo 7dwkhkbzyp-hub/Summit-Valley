@@ -124,25 +124,17 @@ func terrain_height(x: float, z: float) -> float:
     return max(1.5, 7.0 + peak_a + peak_b + peak_c + valley + ridges)
 
 func _setup_environment() -> void:
-    world_env = WorldEnvironment.new()
-    var env := Environment.new()
-    env.background_mode = Environment.BG_COLOR
-    env.background_color = Color("#91bde0")
-    env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-    env.ambient_light_color = Color("#d9e8f4")
-    env.ambient_light_energy = 0.82
-    env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-    world_env.environment = env
-    add_child(world_env)
-
+    # Keep web startup deliberately simple. Safari/WebGL can be sensitive to
+    # environment/tonemapping features on mobile, so the scene uses Godot's
+    # default clear colour and a single directional light.
     sun = DirectionalLight3D.new()
-    sun.light_energy = 1.55
+    sun.light_energy = 1.15
     sun.shadow_enabled = false
-    sun.directional_shadow_max_distance = 80.0
     add_child(sun)
 
     camera = Camera3D.new()
     camera.fov = 55.0
+    camera.current = true
     add_child(camera)
     _update_camera()
 
