@@ -110,12 +110,15 @@ func _process(delta: float) -> void:
     _update_hud()
 
 func terrain_height(x: float, z: float) -> float:
-    var peak_a = 43.0 * exp(-((x + 38.0) ** 2 / 1800.0 + (z - 18.0) ** 2 / 2600.0))
-    var peak_b = 55.0 * exp(-((x - 30.0) ** 2 / 1900.0 + (z + 22.0) ** 2 / 3200.0))
-    var peak_c = 32.0 * exp(-((x + 3.0) ** 2 / 1000.0 + (z + 52.0) ** 2 / 1500.0))
-    var valley = -18.0 * exp(-(x ** 2 / 1500.0 + (z - 15.0) ** 2 / 1900.0))
-    var ridges = 5.5 * sin(x * 0.055) * cos(z * 0.045)
-    return max(1.5, 7.0 + peak_a + peak_b + peak_c + valley + ridges)
+    # A more readable ski mountain: broad valley floor, distinct ridges,
+    # three summit bowls and stronger fall-line elevation changes.
+    var peak_a = 49.0 * exp(-((x + 43.0) ** 2 / 2100.0 + (z - 18.0) ** 2 / 3000.0))
+    var peak_b = 62.0 * exp(-((x - 32.0) ** 2 / 2200.0 + (z + 24.0) ** 2 / 3600.0))
+    var peak_c = 38.0 * exp(-((x + 2.0) ** 2 / 1250.0 + (z + 57.0) ** 2 / 1800.0))
+    var valley = -24.0 * exp(-(x ** 2 / 2100.0 + (z - 20.0) ** 2 / 2600.0))
+    var shoulder = 7.0 * exp(-((x + 65.0) ** 2 / 1700.0 + (z + 20.0) ** 2 / 5000.0))
+    var gullies = 2.8 * sin(x * 0.075 + z * 0.018) * cos(z * 0.052)
+    return max(1.0, 6.0 + peak_a + peak_b + peak_c + valley + shoulder + gullies)
 
 func _setup_environment() -> void:
     world_env = WorldEnvironment.new()
@@ -143,7 +146,7 @@ func _setup_environment() -> void:
 func _build_mountain() -> void:
     var st := SurfaceTool.new()
     st.begin(Mesh.PRIMITIVE_TRIANGLES)
-    st.set_material(_mat(Color("#eaf1f5"), 0.94))
+    st.set_material(_mat(Color("#f3f7fa"), 0.98))
     for z in range(GRID - 1):
         for x in range(GRID - 1):
             var x0 = -MAP_SIZE * 0.5 + x * MAP_SIZE / float(GRID - 1)
@@ -162,13 +165,13 @@ func _build_mountain() -> void:
     terrain_mesh.mesh = st.commit()
     add_child(terrain_mesh)
 
-    # Efficient scenery: shared meshes, not hundreds of independent trees.
+    # Dense lower forest, sparse upper mountain: this makes the elevation readable.
     var tree_mesh := _pine_mesh()
     for i in range(115):
         var x := rng.randf_range(-82.0,82.0)
         var z := rng.randf_range(-82.0,82.0)
         var y := terrain_height(x,z)
-        if y < 11.0 or y > 48.0:
+        if y < 10.0 or y > 43.0:
             continue
         var tree := MeshInstance3D.new()
         tree.mesh = tree_mesh
@@ -178,10 +181,18 @@ func _build_mountain() -> void:
         tree.scale = Vector3(s,s,s)
         scenery_root.add_child(tree)
 
-    for p in [Vector3(-38,49,18),Vector3(30,61,-22),Vector3(0,40,-52)]:
-        var cap := _cone(11.0,7.0,Color("#ffffff"))
+    # Summit snowfields make the high points visually distinct.
+    for p in [Vector3(-43,56,18),Vector3(32,69,-24),Vector3(0,44,-57)]:
+        var cap := _cone(13.0,8.0,Color("#ffffff"))
         cap.position=p
         scenery_root.add_child(cap)
+
+    # A few exposed rock faces break up the otherwise all-white mountain.
+    for p in [Vector3(-58,terrain_height(-58,2)+1.0,2),Vector3(55,terrain_height(55,-12)+1.0,-12),Vector3(5,terrain_height(5,-48)+1.0,-48)]:
+        var rock := _cone(4.5,5.5,Color("#7a858b"))
+        rock.position=p
+        rock.rotation_degrees=Vector3(0,rng.randf_range(0,360),rng.randf_range(-10,10))
+        scenery_root.add_child(rock)
 
 func _build_initial_resort() -> void:
     _building("ALPINE GRAND HOTEL",Vector3(-8,terrain_height(-8,24),24),65000.0)
@@ -212,8 +223,11 @@ func _render_piste(d: Dictionary) -> void:
     st.set_material(_mat(col,0.24))
     for i in range(pts.size()-1):
         var a=pts[i]; var b=pts[i+1]
+        # Keep the piste glued to the actual mountain surface.
+        a.y=terrain_height(a.x,a.z)+0.55
+        b.y=terrain_height(b.x,b.z)+0.55
         var side=(b-a).cross(Vector3.UP).normalized()
-        var w=4.9 if d["difficulty"] != "BLACK" else 4.2
+        var w=6.2 if d["difficulty"] == "GREEN" else (5.7 if d["difficulty"] == "BLUE" else (5.1 if d["difficulty"] == "RED" else 4.6))
         st.add_vertex(a+side*w); st.add_vertex(b+side*w); st.add_vertex(a-side*w)
         st.add_vertex(a-side*w); st.add_vertex(b+side*w); st.add_vertex(b-side*w)
     var mi:=MeshInstance3D.new()
