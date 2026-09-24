@@ -56,6 +56,11 @@ var camera_target := Vector3(0, 20, 0)
 var camera_distance := 115.0
 var camera_yaw := 42.0
 var camera_pitch := -47.0
+var camera_visual_target := Vector3.ZERO
+var camera_visual_yaw := 42.0
+var camera_visual_pitch := -47.0
+var camera_visual_distance := 115.0
+var camera_smooth_ready := false
 var touch_start := Vector2.ZERO
 var last_touch := Vector2.ZERO
 var touch_mode := false
@@ -85,6 +90,7 @@ func _ready() -> void:
     _toast("Welcome to Summit Valley — build a resort and keep the mountain busy!")
 
 func _process(delta: float) -> void:
+    _update_camera(delta)
     if paused:
         _update_hud()
         return
@@ -208,6 +214,8 @@ func _build_initial_resort() -> void:
     _lift(Vector3(-8,terrain_height(-8,24)+2.5,24),Vector3(-20,terrain_height(-20,-42)+2.5,-42),"HIGH-SPEED QUAD")
     _lift(Vector3(20,terrain_height(20,-5)+2.5,-5),Vector3(31,terrain_height(31,-43)+2.5,-43),"GONDOLA")
     _lift(Vector3(1,terrain_height(1,16)+2.5,18),Vector3(27,terrain_height(27,-20)+2.5,-20),"DETACHABLE SIX")
+    _lift(Vector3(-52,terrain_height(-52,8)+2.5,8),Vector3(-38,terrain_height(-38,-58)+2.5,-58),"CABLE CAR")
+    _lift(Vector3(5,terrain_height(5,31)+0.6,31),Vector3(9,terrain_height(9,17)+0.6,17),"MAGIC CARPET")
 
 func _piste(points: Array, difficulty: String) -> void:
     var d = {"points":PackedVector3Array(points),"difficulty":difficulty,"condition":100.0,"open":true,"name":difficulty+" RUN "+str(pistes.size()+1)}
@@ -260,70 +268,193 @@ func _piste_marker(pos:Vector3,col:Color)->void:
     piste_root.add_child(flag)
 
 func _lift(a:Vector3,b:Vector3,type_name:String)->void:
-    var data={"a":a,"b":b,"type":type_name,"carriers":[],"phase":rng.randf()}
+    if type_name == "MAGIC CARPET":
+        _magic_carpet(a,b)
+        return
+
+    var is_cable_car := type_name.find("CABLE CAR") >= 0
+    var is_gondola := type_name.find("GONDOLA") >= 0
+    var is_chair := not is_cable_car and not is_gondola
+    var data={
+        "a":a,
+        "b":b,
+        "type":type_name,
+        "carriers":[],
+        "phase":rng.randf()
+    }
+    # The two haul-rope tracks are offset perpendicular to the lift line.
+    # Every carrier and every rope segment uses this same side vector, so the
+    # vehicles visibly sit on the wires instead of floating beside them.
+    var horizontal:=Vector3(b.x-a.x,0,b.z-a.z)
+    var track_side:=Vector3(-horizontal.z,0,horizontal.x).normalized()
+    data["track_side"]=track_side
+    data["cable_height"]=9.0 if is_chair else (10.0 if is_gondola else 12.0)
     lifts.append(data)
-    var tower_count:=10
+
+    var tower_count:=12 if is_cable_car else 10
     for i in range(tower_count):
         var t=float(i)/float(tower_count-1)
-        var p=a.lerp(b,t)
-        var h:=9.0
-        var tower:=_box(Vector3(0.72,h,0.72),Color("#68747b"))
-        tower.position=p+Vector3.UP*h*0.5
+        var p=_lift_cable_pos(data,t,0.0)
+        var h:=9.0 if is_chair else (10.0 if is_gondola else 12.0)
+        var tower:=_box(Vector3(0.82,h,0.82),Color("#68747b"))
+        tower.position=p+Vector3.DOWN*0.0+Vector3.UP*(-data["cable_height"]+h*0.5)
+        # Tower legs are planted on the mountain, while the crossarm sits exactly
+        # at the two rope heights.
+        tower.position.y=terrain_height(p.x,p.z)+h*0.5+2.0
         lift_root.add_child(tower)
-        var cross:=_box(Vector3(5.4,0.28,0.45),Color("#4d565d"))
-        cross.position=p+Vector3.UP*h
+
+        var cross_len:=5.8 if is_chair else (6.8 if is_gondola else 7.6)
+        var cross:=_beam(p-track_side*cross_len*0.5,p+track_side*cross_len*0.5,0.32,Color("#4d565d"))
         lift_root.add_child(cross)
-        for sx in [-2.0,2.0]:
-            var sheave:=_cylinder(0.36,0.18,Color("#1f2327"))
-            sheave.position=p+Vector3(sx,h-0.3,0)
+        for side_sign in [-1.0,1.0]:
+            var sheave_pos=p+track_side*side_sign*2.0
+            var sheave:=_cylinder(0.42 if is_cable_car else 0.36,0.24,Color("#1f2327"))
+            sheave.position=sheave_pos
             sheave.rotation_degrees.x=90
             lift_root.add_child(sheave)
 
-    # Twin haul ropes with visible sag, matching the carrier path.
+    # Continuous twin haul ropes. The carrier path below is sampled from the
+    # exact same function, so the wire and vehicles remain matched.
     for run in [-1.0,1.0]:
-        for i in range(24):
-            var t0=float(i)/24.0
-            var t1=float(i+1)/24.0
-            var p0=a.lerp(b,t0)+Vector3(run*2.0,9.0-sin(t0*PI)*2.8,0)
-            var p1=a.lerp(b,t1)+Vector3(run*2.0,9.0-sin(t1*PI)*2.8,0)
-            lift_root.add_child(_beam(p0,p1,0.11,Color("#15191d")))
+        for i in range(36):
+            var t0=float(i)/36.0
+            var t1=float(i+1)/36.0
+            var p0=_lift_cable_pos(data,t0,run)
+            var p1=_lift_cable_pos(data,t1,run)
+            lift_root.add_child(_beam(p0,p1,0.13 if is_cable_car else 0.11,Color("#15191d")))
 
     _lift_station(a,"BOTTOM",type_name)
     _lift_station(b,"TOP",type_name)
 
-    var count:=14 if type_name.find("GONDOLA")<0 else 10
-    for i in range(count):
-        var carrier:=Node3D.new()
-        var t=float(i)/float(count)
-        carrier.position=a.lerp(b,t)+Vector3.UP*(8.7-sin(t*PI)*2.8)
-        carrier.set_meta("lift_t",t)
-        carrier.set_meta("lift_speed",0.012 if type_name.find("GONDOLA")<0 else 0.009)
+    if is_cable_car:
+        # Two large aerial-tram cabins, one on each side of the loop.
+        for run in [-1.0,1.0]:
+            var carrier:=Node3D.new()
+            carrier.position=_lift_cable_pos(data,0.5,run)
+            carrier.set_meta("lift_t",0.5 if run < 0.0 else 0.0)
+            carrier.set_meta("lift_dir",1.0 if run < 0.0 else -1.0)
+            carrier.set_meta("lift_speed",0.018)
+            carrier.set_meta("lift_run",run)
+            _cable_car_vehicle(carrier)
+            lift_root.add_child(carrier)
+            data["carriers"].append(carrier)
+    else:
+        var count:=14 if is_chair else 12
+        var spacing:=1.0/float(count)
+        for run in [-1.0,1.0]:
+            for i in range(count):
+                var carrier:=Node3D.new()
+                var t=(float(i)/float(count)+0.02) if run < 0.0 else (1.0-(float(i)/float(count)+0.02))
+                carrier.position=_lift_cable_pos(data,t,run)
+                carrier.set_meta("lift_t",t)
+                carrier.set_meta("lift_dir",1.0 if run < 0.0 else -1.0)
+                carrier.set_meta("lift_speed",0.012 if is_chair else 0.009)
+                carrier.set_meta("lift_run",run)
+                var hanger_len:=1.55 if is_chair else 1.75
+                var hanger:=_beam(Vector3.ZERO,Vector3(0,-hanger_len,0),0.085,Color("#252a2e"))
+                carrier.add_child(hanger)
 
-        # The carrier is suspended from the actual haul rope by a visible hanger.
-        var hanger:=_beam(Vector3(0,0.05,0),Vector3(0,-1.55,0),0.085,Color("#252a2e"))
-        carrier.add_child(hanger)
+                if is_gondola:
+                    var hanger_bar:=_beam(Vector3(-0.8,-1.35,0),Vector3(0.8,-1.35,0),0.065,Color("#252a2e"))
+                    carrier.add_child(hanger_bar)
+                    var cabin:=_box(Vector3(2.8,2.0,2.15),Color("#e3e8ea"))
+                    cabin.position.y=-2.65
+                    carrier.add_child(cabin)
+                    var glass_front:=_box(Vector3(2.5,1.15,0.12),Color("#72b9d7"))
+                    glass_front.position=Vector3(0,-2.65,-1.11)
+                    carrier.add_child(glass_front)
+                    var glass_back:=_box(Vector3(2.5,1.15,0.12),Color("#72b9d7"))
+                    glass_back.position=Vector3(0,-2.65,1.11)
+                    carrier.add_child(glass_back)
+                    var door:=_box(Vector3(0.9,1.35,0.08),Color("#3f5965"))
+                    door.position=Vector3(0,-2.6,-1.18)
+                    carrier.add_child(door)
+                else:
+                    var spreader:=_beam(Vector3(0,-1.35,0),Vector3(0,-1.9,0),0.07,Color("#303438"))
+                    carrier.add_child(spreader)
+                    var seat:=_box(Vector3(2.8,0.24,1.05),Color("#b72e34"))
+                    seat.position.y=-2.15
+                    carrier.add_child(seat)
+                    var back:=_box(Vector3(2.8,1.05,0.18),Color("#8f252b"))
+                    back.position=Vector3(0,-1.65,0.35)
+                    carrier.add_child(back)
+                    var safety:=_beam(Vector3(-1.15,-1.75,-0.25),Vector3(1.15,-1.75,-0.25),0.055,Color("#d9b64c"))
+                    carrier.add_child(safety)
+                lift_root.add_child(carrier)
+                data["carriers"].append(carrier)
 
-        if type_name.find("GONDOLA")>=0:
-            var cabin:=_box(Vector3(2.8,1.9,2.15),Color("#e3e8ea"))
-            cabin.position.y=-2.8
-            carrier.add_child(cabin)
-            var glass:=_box(Vector3(2.45,1.05,0.12),Color("#72b9d7"))
-            glass.position=Vector3(0,-2.8,-1.1)
-            carrier.add_child(glass)
-        else:
-            # Classic detachable-chair silhouette: hanger, suspension bar, chair, backrest and safety bar.
-            var spreader:=_beam(Vector3(0,-1.35,0),Vector3(0,-1.9,0),0.07,Color("#303438"))
-            carrier.add_child(spreader)
-            var seat:=_box(Vector3(2.8,0.24,1.05),Color("#b72e34"))
-            seat.position.y=-2.15
-            carrier.add_child(seat)
-            var back:=_box(Vector3(2.8,1.05,0.18),Color("#8f252b"))
-            back.position=Vector3(0,-1.65,0.35)
-            carrier.add_child(back)
-            var safety:=_beam(Vector3(-1.15,-1.75,-0.25),Vector3(1.15,-1.75,-0.25),0.055,Color("#d9b64c"))
-            carrier.add_child(safety)
-        lift_root.add_child(carrier)
-        data["carriers"].append(carrier)
+func _lift_cable_pos(data:Dictionary,t:float,run:float)->Vector3:
+    var a:Vector3=data["a"]
+    var b:Vector3=data["b"]
+    var side:Vector3=data["track_side"]
+    var sag:=2.8 if data["type"].find("CABLE CAR") < 0 else 3.6
+    var height:float=data["cable_height"]
+    return a.lerp(b,clamp(t,0.0,1.0))+side*run*2.0+Vector3.UP*(height-sin(clamp(t,0.0,1.0)*PI)*sag)
+
+func _cable_car_vehicle(carrier:Node3D)->void:
+    var hanger:=_beam(Vector3.ZERO,Vector3(0,-2.2,0),0.12,Color("#252a2e"))
+    carrier.add_child(hanger)
+    var roof:=_box(Vector3(4.8,0.35,3.0),Color("#343c42"))
+    roof.position=Vector3(0,-2.45,0)
+    carrier.add_child(roof)
+    var cabin:=_box(Vector3(4.4,2.9,2.7),Color("#dce4e7"))
+    cabin.position=Vector3(0,-3.95,0)
+    carrier.add_child(cabin)
+    var front:=_box(Vector3(3.9,1.8,0.12),Color("#69b8d4"))
+    front.position=Vector3(0,-3.9,-1.39)
+    carrier.add_child(front)
+    var rear:=_box(Vector3(3.9,1.8,0.12),Color("#69b8d4"))
+    rear.position=Vector3(0,-3.9,1.39)
+    carrier.add_child(rear)
+    for x in [-1.7,1.7]:
+        var window:=_box(Vector3(0.12,1.7,1.9),Color("#69b8d4"))
+        window.position=Vector3(x,-3.9,0)
+        carrier.add_child(window)
+    var door:=_box(Vector3(1.0,1.9,0.08),Color("#3d5964"))
+    door.position=Vector3(0,-3.9,-1.46)
+    carrier.add_child(door)
+    var bumper:=_box(Vector3(4.0,0.18,0.28),Color("#20262b"))
+    bumper.position=Vector3(0,-5.45,-1.35)
+    carrier.add_child(bumper)
+
+func _magic_carpet(a:Vector3,b:Vector3)->void:
+    var data={"a":a,"b":b,"type":"MAGIC CARPET","carriers":[]}
+    lifts.append(data)
+    var dir:=Vector3(b.x-a.x,0,b.z-a.z).normalized()
+    var side:=Vector3(-dir.z,0,dir.x)
+    var length:=a.distance_to(b)
+    # Belt surface, side rails and a weather canopy: a recognisable beginner-area carpet.
+    var belt:=_box(Vector3(3.8,0.18,length),Color("#1f2428"))
+    belt.position=(a+b)*0.5+Vector3.UP*0.22
+    belt.rotation.y=atan2(dir.x,dir.z)
+    lift_root.add_child(belt)
+    for s in [-1.0,1.0]:
+        var rail_a=a+side*s*2.1+Vector3.UP*0.8
+        var rail_b=b+side*s*2.1+Vector3.UP*0.8
+        lift_root.add_child(_beam(rail_a,rail_b,0.10,Color("#68747b")))
+        for i in range(5):
+            var t=float(i)/4.0
+            var p=a.lerp(b,t)+side*s*2.1+Vector3.UP*0.8
+            var post:=_beam(p-Vector3.UP*0.8,p,0.09,Color("#4d565d"))
+            lift_root.add_child(post)
+    # Four canopy frames and translucent roof panels.
+    for i in range(4):
+        var t=float(i)/3.0
+        var p=a.lerp(b,t)
+        var left=p-side*2.6
+        var right=p+side*2.6
+        lift_root.add_child(_beam(left+Vector3.UP*0.8,left+Vector3.UP*4.0,0.16,Color("#4d565d")))
+        lift_root.add_child(_beam(right+Vector3.UP*0.8,right+Vector3.UP*4.0,0.16,Color("#4d565d")))
+        var roof:=_box(Vector3(5.4,0.18,5.0),Color("#b7d7e4"))
+        roof.position=p+Vector3.UP*4.0
+        roof.rotation.y=atan2(dir.x,dir.z)
+        lift_root.add_child(roof)
+    var label:=Label3D.new()
+    label.text="MAGIC CARPET"
+    label.font_size=24
+    label.outline_size=7
+    label.position=(a+b)*0.5+Vector3.UP*5.2
+    lift_root.add_child(label)
 
 func _lift_station(pos:Vector3,side:String,type_name:String)->void:
     var root:=Node3D.new()
@@ -447,11 +578,20 @@ func _animate_guests(dt:float)->void:
 
 func _animate_lifts(dt:float)->void:
     for data in lifts:
+        if data["type"] == "MAGIC CARPET":
+            continue
         for carrier in data["carriers"]:
             var t=float(carrier.get_meta("lift_t"))
-            t=fmod(t+float(carrier.get_meta("lift_speed"))*dt,1.0)
+            var dir=float(carrier.get_meta("lift_dir"))
+            var speed=float(carrier.get_meta("lift_speed"))
+            t=fposmod(t+speed*dir*dt,1.0)
             carrier.set_meta("lift_t",t)
-            carrier.position=data["a"].lerp(data["b"],t)+Vector3.UP*(8.7-sin(t*PI)*2.8)
+            var run=float(carrier.get_meta("lift_run"))
+            carrier.position=_lift_cable_pos(data,t,run)
+            var tangent:Vector3=(data["b"]-data["a"]).normalized()
+            if dir < 0.0:
+                tangent=-tangent
+            carrier.look_at(carrier.position+tangent,Vector3.UP)
 
 func _economy_tick()->void:
     var open_pistes:=0
@@ -631,7 +771,6 @@ func _unhandled_input(event:InputEvent)->void:
             var diff=event.position-last_touch
             camera_yaw-=diff.x*0.25
             camera_pitch=clamp(camera_pitch-diff.y*0.12,-72.0,-28.0)
-            _update_camera()
             last_touch=event.position
         return
 
@@ -654,16 +793,14 @@ func _unhandled_input(event:InputEvent)->void:
             paint_points.append(p+Vector3.UP*0.4)
     elif event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_WHEEL_UP:
         camera_distance=clamp(camera_distance-7.0,55.0,160.0)
-        _update_camera()
     elif event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_WHEEL_DOWN:
         camera_distance=clamp(camera_distance+7.0,55.0,160.0)
-        _update_camera()
 
 func _focus_ground(pos:Vector2)->void:
     var p=_screen_ground(pos)
     if p!=Vector3.INF:
         camera_target=p
-        _update_camera()
+
 
 func _screen_ground(pos:Vector2)->Vector3:
     var origin=camera.project_ray_origin(pos)
@@ -675,13 +812,30 @@ func _screen_ground(pos:Vector2)->Vector3:
     p.y=terrain_height(p.x,p.z)
     return p
 
-func _update_camera()->void:
+func _update_camera(delta:float=0.016)->void:
     if not camera:return
     var yaw=deg_to_rad(camera_yaw)
     var pitch=deg_to_rad(camera_pitch)
-    var offset=Vector3(cos(pitch)*sin(yaw),-sin(pitch),cos(pitch)*cos(yaw))*camera_distance
-    camera.position=camera_target+offset
-    camera.look_at(camera_target,Vector3.UP)
+    var desired_offset=Vector3(cos(pitch)*sin(yaw),-sin(pitch),cos(pitch)*cos(yaw))*camera_distance
+    var desired_position=camera_target+desired_offset
+    if not camera_smooth_ready:
+        camera_visual_target=camera_target
+        camera_visual_yaw=camera_yaw
+        camera_visual_pitch=camera_pitch
+        camera_visual_distance=camera_distance
+        camera.position=desired_position
+        camera.look_at(camera_target,Vector3.UP)
+        camera_smooth_ready=true
+        camera.set_physics_interpolation_mode(Node.PHYSICS_INTERPOLATION_MODE_OFF)
+        return
+    var blend=1.0-exp(-12.0*max(delta,0.001))
+    camera_visual_target=camera_visual_target.lerp(camera_target,blend)
+    camera_visual_yaw=lerp_angle(camera_visual_yaw,deg_to_rad(camera_yaw),blend)
+    camera_visual_pitch=lerp(camera_visual_pitch,deg_to_rad(camera_pitch),blend)
+    camera_visual_distance=lerp(camera_visual_distance,camera_distance,blend)
+    var smooth_offset=Vector3(cos(camera_visual_pitch)*sin(camera_visual_yaw),-sin(camera_visual_pitch),cos(camera_visual_pitch)*cos(camera_visual_yaw))*camera_visual_distance
+    camera.position=camera_visual_target+smooth_offset
+    camera.look_at(camera_visual_target,Vector3.UP)
 
 func _update_sun()->void:
     var angle=(hour-12.0)*7.5
