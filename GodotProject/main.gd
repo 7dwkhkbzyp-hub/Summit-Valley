@@ -4,7 +4,7 @@ extends Node3D
 # Designed as a lightweight Godot 4 Web/mobile prototype with real gameplay loops.
 
 const MAP_SIZE := 300.0
-const GRID := 82
+const GRID := 56
 const START_CASH := 250000.0
 const MAX_GUESTS := 320
 const PISTE_COLOURS := {
@@ -131,8 +131,8 @@ func _setup_environment() -> void:
 
     sun = DirectionalLight3D.new()
     sun.light_energy = 1.55
-    sun.shadow_enabled = true
-    sun.directional_shadow_max_distance = 220.0
+    sun.shadow_enabled = false
+    sun.directional_shadow_max_distance = 80.0
     add_child(sun)
 
     camera = Camera3D.new()
@@ -164,7 +164,7 @@ func _build_mountain() -> void:
 
     # Efficient scenery: shared meshes, not hundreds of independent trees.
     var tree_mesh := _pine_mesh()
-    for i in range(280):
+    for i in range(120):
         var x := rng.randf_range(-138.0,138.0)
         var z := rng.randf_range(-138.0,138.0)
         var y := terrain_height(x,z)
@@ -234,7 +234,7 @@ func _render_piste(d: Dictionary) -> void:
 
     for i in range(pts.size()-1):
         var a=pts[i]; var b=pts[i+1]
-        var count=max(1,int(a.distance_to(b)/6.0))
+        var count=max(1,int(a.distance_to(b)/14.0))
         var side=(b-a).cross(Vector3.UP).normalized()
         for j in range(count):
             var t=(float(j)+0.5)/float(count)
@@ -250,10 +250,10 @@ func _render_piste(d: Dictionary) -> void:
     piste_root.add_child(sign)
 
 func _piste_marker(pos:Vector3,col:Color)->void:
-    var pole:=_cylinder(0.07,2.5,Color("#f1f4f6"))
+    var pole:=_cylinder(0.055,2.0,Color("#f1f4f6"))
     pole.position=pos+Vector3.UP*1.25
     piste_root.add_child(pole)
-    var flag:=_box(Vector3(0.7,0.48,0.12),col)
+    var flag:=_box(Vector3(0.55,0.38,0.10),col)
     flag.position=pos+Vector3.UP*2.1
     piste_root.add_child(flag)
 
@@ -261,8 +261,8 @@ func _lift(a:Vector3,b:Vector3,type_name:String)->void:
     var data={"a":a,"b":b,"type":type_name,"carriers":[],"phase":rng.randf()}
     lifts.append(data)
 
-    var tower_count:=12
-    var cable_height:=9.5
+    var tower_count:=8
+    var cable_height:=8.5
     var lateral:=2.15
     var span_dir:Vector3=(b-a).normalized()
     var side_dir:Vector3=span_dir.cross(Vector3.UP).normalized()
@@ -275,7 +275,7 @@ func _lift(a:Vector3,b:Vector3,type_name:String)->void:
         tower.position=p+Vector3.UP*h*0.5
         lift_root.add_child(tower)
 
-        var cross:=_box(Vector3(6.4,0.34,0.55),Color("#454f55"))
+        var cross:=_box(Vector3(5.4,0.30,0.50),Color("#454f55"))
         cross.position=p+Vector3.UP*h
         cross.rotation.y=atan2((b-a).x,(b-a).z)
         lift_root.add_child(cross)
@@ -299,7 +299,7 @@ func _lift(a:Vector3,b:Vector3,type_name:String)->void:
     _lift_station(a,"BOTTOM",type_name)
     _lift_station(b,"TOP",type_name)
 
-    var count:=18 if type_name.find("GONDOLA")<0 else 12
+    var count:=10 if type_name.find("GONDOLA")<0 else 7
     for run in [-1.0,1.0]:
         for i in range(count):
             var carrier:=Node3D.new()
@@ -340,7 +340,7 @@ func _lift_cable_position(data:Dictionary,t:float,run:float)->Vector3:
     var b:Vector3=data["b"]
     var span:Vector3=(b-a).normalized()
     var side:Vector3=span.cross(Vector3.UP).normalized()
-    var y:=9.5-sin(t*PI)*2.2
+    var y:=8.5-sin(t*PI)*2.2
     return a.lerp(b,t)+Vector3.UP*y+side*(run*2.15)
 
 func _lift_station(pos:Vector3,side:String,type_name:String)->void:
