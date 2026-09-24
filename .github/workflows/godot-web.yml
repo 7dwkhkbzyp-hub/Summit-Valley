@@ -1,0 +1,28 @@
+name: Build Summit Valley Godot Web
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.4.1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare Godot project
+        run: godot --headless --path GodotProject --editor --quit
+      - name: Export Web
+        run: |
+          mkdir -p build/web
+          godot --headless --path GodotProject --export-release "Web" build/web/index.html
+      - name: Publish to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: build/web
