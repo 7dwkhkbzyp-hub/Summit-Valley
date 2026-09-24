@@ -1,0 +1,15 @@
+newmtl wood
+Kd 0.48 0.24 0.12
+Ns 30
+newmtl default
+Kd 0.8 0.8 0.8
+Ns 30
+newmtl green
+Kd 0.04 0.3 0.19
+Ns 30
+newmtl snow
+Kd 0.94 0.98 1
+Ns 30
+newmtl green2
+Kd 0.08 0.42 0.25
+Ns 30
