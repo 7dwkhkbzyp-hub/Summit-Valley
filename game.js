@@ -975,7 +975,7 @@ function svUpdateEconomy(dt){
   cash+=dt*(ticketIncome+guestSpend-wages);
   SV.reputation=Math.max(1,Math.min(100,SV.reputation+dt*((weatherPenalty<.7?-0.08:.035)+(SV.facilities.food?.012:0))));
   document.getElementById("guests").textContent=Math.round(count);
-  document.getElementById("reputation").textContent=Math.round(SV.reputation);
+  document.getElementById("rep").textContent=Math.round(SV.reputation);
 }
 function svNewGuest(i){
   const p=paths[i%Math.max(1,paths.length)];
