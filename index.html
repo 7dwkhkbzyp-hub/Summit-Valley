@@ -1,96 +1,123 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="theme-color" content="#07131f"><link rel="manifest" href="manifest.json"><title>Summit Valley — Ski Resort Tycoon V3</title>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#07121d"><link rel="manifest" href="manifest.json"><title>Summit Valley — Ski Resort Tycoon</title>
 <style>
-*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07131f;color:#fff;font-family:system-ui,-apple-system,sans-serif;touch-action:none}canvas{position:fixed;inset:0;width:100%;height:100%}.p{background:rgba(5,13,22,.78);border:1px solid #ffffff20;border-radius:14px;backdrop-filter:blur(12px);box-shadow:0 10px 30px #0006}#logo{position:fixed;top:12px;left:12px;padding:10px 14px;font-weight:900;letter-spacing:.15em}#logo b{color:#55d5ff}#stats{position:fixed;top:12px;right:12px;padding:8px 12px;display:flex;gap:16px;font-size:10px;color:#a8bac8}.s b{display:block;color:#fff;font-size:13px}#bar{position:fixed;bottom:12px;left:12px;right:12px;padding:7px;display:flex;gap:5px;flex-wrap:wrap}button{background:#142b40;color:#eef8ff;border:1px solid #ffffff14;border-radius:9px;padding:9px 11px;font-weight:800;font-size:11px}button.on{background:#087fae}#info{position:fixed;left:12px;top:62px;padding:10px;width:260px;font-size:11px;color:#aec0cf;line-height:1.4}#toast{position:fixed;top:82px;left:50%;transform:translateX(-50%);padding:10px 14px;opacity:0;transition:.2s;font-size:12px}
-@media(max-width:650px){#stats .s:nth-child(n+4){display:none}button{padding:10px 9px}}
-</style></head><body>
-<canvas id="c"></canvas><div id="logo" class="p">SUMMIT <b>VALLEY</b><small style="display:block;font-size:8px;letter-spacing:.12em;color:#8ea6b8">ALPINE RESORT TYCOON</small></div>
-<div id="stats" class="p"><div class="s">SNOW<b id="sn">92 cm</b></div><div class="s">GUESTS<b id="gu">60</b></div><div class="s">PISTES<b id="pi">5</b></div><div class="s">LIFTS<b id="lf">2</b></div><div class="s">REPUTATION<b id="rep">72%</b></div><div class="s">CASH<b id="ca">£24,800</b></div></div>
-<div id="info" class="p"><b>SUMMIT VALLEY — RESORT MANAGEMENT</b><br>Build the resort, not just the scenery. Guests ski, visit facilities, spend money and affect reputation. Build pistes and lifts, manage weather and grooming, then expand.</div>
-<div id="toast" class="p"></div>
-<div id="bar" class="p"><button id="sel" class="on">SELECT</button><button id="bp">BUILD PISTE</button><button id="bl">LIFTS</button><button id="chair">CHAIRLIFT</button><button id="gondola">GONDOLA</button><button id="magic">CARPET</button><button id="fin" style="display:none">FINISH</button><button id="gr">GROOM</button><button id="nw">SNOW</button><button id="su">SUN</button><button id="pa">PAUSE</button><button id="sp">1×</button></div>
-<script>
-const c=document.getElementById('c'),g=c.getContext('webgl2',{antialias:true});if(!g){alert('This game needs WebGL2. Please use current Safari.')}
-let d=Math.min(devicePixelRatio||1,1.7);function rs(){c.width=innerWidth*d;c.height=innerHeight*d;g.viewport(0,0,c.width,c.height)}addEventListener('resize',rs);rs();
-const V=`#version 300 es
-in vec3 p,n,col;uniform mat4 P,V,M;out vec3 N,C,W;void main(){vec4 w=M*vec4(p,1.);W=w.xyz;N=mat3(M)*n;C=col;gl_Position=P*V*w;}`;
-const F=`#version 300 es
-precision highp float;in vec3 N,C,W;uniform vec3 sun;uniform float snow,heat;out vec4 o;void main(){float l=.32+.68*max(dot(normalize(N),normalize(sun)),0.);float h=clamp((W.y+2.)/30.,0.,1.);float cover=clamp(.08+h*.7+snow*.35-heat*.4,0.,1.);
-float rock=1.-smoothstep(.68,.9,h);
-vec3 rockC=vec3(.24,.26,.27);
-vec3 snowC=vec3(.91,.96,1.0);
-vec3 c=mix(C,rockC,rock*.7);
-c=mix(c,snowC,cover);
-float ridge=sin(W.x*1.7+W.z*.9)*.035+sin(W.x*4.2-W.z*2.1)*.018;
-c+=ridge;
-o=vec4(c*l,1.);}`;
-function shader(t,s){let x=g.createShader(t);g.shaderSource(x,s);g.compileShader(x);return x}let pg=g.createProgram();g.attachShader(pg,shader(g.VERTEX_SHADER,V));g.attachShader(pg,shader(g.FRAGMENT_SHADER,F));g.linkProgram(pg);
-const L={p:g.getAttribLocation(pg,'p'),n:g.getAttribLocation(pg,'n'),c:g.getAttribLocation(pg,'col'),P:g.getUniformLocation(pg,'P'),V:g.getUniformLocation(pg,'V'),M:g.getUniformLocation(pg,'M'),sun:g.getUniformLocation(pg,'sun'),snow:g.getUniformLocation(pg,'snow'),heat:g.getUniformLocation(pg,'heat')};
-function I(){let m=new Float32Array(16);m[0]=m[5]=m[10]=m[15]=1;return m}function T(x,y,z){let m=I();m[12]=x;m[13]=y;m[14]=z;return m}function Sc(x,y,z){let m=I();m[0]=x;m[5]=y;m[10]=z;return m}function Ry(a){let m=I(),c=Math.cos(a),s=Math.sin(a);m[0]=c;m[2]=-s;m[8]=s;m[10]=c;return m}function Mul(a,b){let r=new Float32Array(16);for(let j=0;j<4;j++)for(let i=0;i<4;i++)r[j*4+i]=a[i]*b[j*4]+a[4+i]*b[j*4+1]+a[8+i]*b[j*4+2]+a[12+i]*b[j*4+3];return r}
-function Pers(f,a,n,z){let t=1/Math.tan(f/2),m=new Float32Array(16);m[0]=t/a;m[5]=t;m[10]=(z+n)/(n-z);m[11]=-1;m[14]=2*z*n/(n-z);return m}function Look(e,t){let z=[e[0]-t[0],e[1]-t[1],e[2]-t[2]],l=Math.hypot(...z);z=z.map(x=>x/l);let x=[z[2],0,-z[0]],xl=Math.hypot(...x);x=x.map(v=>v/xl);let y=[x[1]*z[2]-x[2]*z[1],x[2]*z[0]-x[0]*z[2],x[0]*z[1]-x[1]*z[0]];return new Float32Array([x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,-x[0]*e[0]-x[1]*e[1]-x[2]*e[2],-y[0]*e[0]-y[1]*e[1]-y[2]*e[2],-z[0]*e[0]-z[1]*e[1]-z[2]*e[2],1])}
-function H(x,z){let r=Math.hypot(x,z),y=28*Math.max(0,1-r/53);y+=7*Math.exp(-((x+14)**2+(z-5)**2)/400)+4*Math.exp(-((x-16)**2+(z+13)**2)/300)-4*Math.exp(-((x+20)**2+(z+17)**2)/300);return y+1.5*Math.sin(x*.23)*Math.cos(z*.19)}
-function N(x,z){let e=.25,a=H(x-e,z),b=H(x+e,z),q=H(x,z-e),r=H(x,z+e),v=[a-b,2*e,q-r],l=Math.hypot(...v);return v.map(x=>x/l)}
-function Mesh(v){let a=g.createVertexArray(),b=g.createBuffer();g.bindVertexArray(a);g.bindBuffer(g.ARRAY_BUFFER,b);g.bufferData(g.ARRAY_BUFFER,new Float32Array(v),g.STATIC_DRAW);[[L.p,0],[L.n,3],[L.c,6]].forEach(x=>{g.enableVertexAttribArray(x[0]);g.vertexAttribPointer(x[0],3,g.FLOAT,false,36,x[1]*4)});return{a,n:v.length/9}}
-function Cube(){let q=[[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]],f=[[0,1,2,0,2,3],[4,6,5,4,7,6],[0,4,5,0,5,1],[3,2,6,3,6,7],[1,5,6,1,6,2],[0,3,7,0,7,4]],ns=[[0,0,-1],[0,0,1],[0,-1,0],[0,1,0],[1,0,0],[-1,0,0]],v=[];for(let k=0;k<6;k++)for(let i of f[k]){let p=q[i];v.push(p[0],p[1],p[2],...ns[k],.45,.5,.55)}return Mesh(v)}const BOX=Cube();
-function Mat(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p){return new Float32Array([a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p])}
-function Tube(a,b,r,col){let v=[],dx=b[0]-a[0],dy=b[1]-a[1],dz=b[2]-a[2],L=Math.hypot(dx,dy,dz)||1;let ux=dx/L,uy=dy/L,uz=dz/L,ax=Math.abs(uy)<.9?[0,1,0]:[1,0,0],vx=uy*ax[2]-uz*ax[1],vy=uz*ax[0]-ux*ax[2],vz=ux*ax[1]-uy*ax[0],vl=Math.hypot(vx,vy,vz);vx/=vl;vy/=vl;vz/=vl;let wx=uy*vz-uz*vy,wy=uz*vx-ux*vz,wz=ux*vy-uy*vx,N=8;for(let t=0;t<=1;t++)for(let q=0;q<N;q++){let ang=q*Math.PI*2/N,rr=r*Math.cos(ang),ss=r*Math.sin(ang),cx=a[0]+dx*t+vx*rr+wx*ss,cy=a[1]+dy*t+vy*rr+wy*ss,cz=a[2]+dz*t+vz*rr+wz*ss;v.push(cx,cy,cz,cx,cy,cz,...col)}let out=[];for(let t=0;t<1;t++)for(let q=0;q<N;q++){let A=t*N+q,B=t*N+(q+1)%N,C=(t+1)*N+(q+1)%N,D=(t+1)*N+q;for(let z of [A,B,C,A,C,D])out.push(...v.slice(z*9,z*9+9))}return Mesh(out)}
-function tree(x,z,scale=1){let y=H(x,z);return [
- [BOX,Mul(T(x,y+1*scale,z),Sc(.22*scale,1.1*scale,.22*scale))],
- [BOX,Mul(T(x,y+2.1*scale,z),Sc(1.05*scale,1.35*scale,1.05*scale))],
- [BOX,Mul(T(x,y+3.0*scale,z),Sc(.72*scale,1.0*scale,.72*scale))]]}
-function skier(x,z,ang=0,scale=1){let y=H(x,z)+.45;return [[BOX,Mul(T(x,y+.35*scale,z),Sc(.16*scale,.42*scale,.16*scale))],[BOX,Mul(T(x,y+.82*scale,z),Sc(.22*scale,.22*scale,.22*scale))],[BOX,Mul(T(x+.27*scale*Math.cos(ang),y+.05*scale,z+.27*scale*Math.sin(ang)),Sc(.035*scale,.55*scale,.035*scale))],[BOX,Mul(T(x-.27*scale*Math.cos(ang),y+.05*scale,z-.27*scale*Math.sin(ang)),Sc(.035*scale,.55*scale,.035*scale))]]}
-function draw(m,M){g.bindVertexArray(m.a);g.uniformMatrix4fv(L.M,false,M);g.drawArrays(g.TRIANGLES,0,m.n)}
-function terrain(){let n=75,s=58,v=[];for(let z=0;z<n-1;z++)for(let x=0;x<n-1;x++){let P=[];for(let k of [[x,z],[x+1,z],[x,z+1],[x+1,z+1]]){let X=-s/2+k[0]*s/(n-1),Z=-s/2+k[1]*s/(n-1),Y=H(X,Z)-1.4,nm=N(X,Z);P.push([X,Y,Z,...nm])}for(let tri of [[0,1,2],[1,3,2]])for(let i of tri){let p=P[i];v.push(...p,.20+.004*p[1],.35+.007*p[1],.25+.009*p[1])}}return Mesh(v)}const TERR=terrain();
-const PC={green:[.05,.72,.34],blue:[.04,.35,.9],red:[.9,.07,.09],black:[.025,.03,.035]};
-function Ribbon(p,w,col){let v=[];for(let i=0;i<p.length-1;i++){let a=p[i],b=p[i+1],dx=b[0]-a[0],dz=b[2]-a[2],l=Math.hypot(dx,dz)||1,nx=-dz/l,nz=dx/l;let pts=[[a[0]+nx*w,H(a[0]+nx*w,a[2]+nz*w)+.18,a[2]+nz*w],[b[0]+nx*w,H(b[0]+nx*w,b[2]+nz*w)+.18,b[2]+nz*w],[a[0]-nx*w,H(a[0]-nx*w,a[2]-nz*w)+.18,a[2]-nz*w],[b[0]-nx*w,H(b[0]-nx*w,b[2]-nz*w)+.18,b[2]-nz*w]];for(let q of [pts[0],pts[1],pts[2],pts[1],pts[3],pts[2]])v.push(q[0],q[1],q[2],0,1,0,...col)}return Mesh(v)}
-let pistes=[];function diff(p){let s=0;for(let i=1;i<p.length;i++)s+=Math.abs(p[i-1][1]-p[i][1])/(Math.hypot(p[i-1][0]-p[i][0],p[i-1][2]-p[i][2])||1);s/=p.length-1;return s<.18?'green':s<.3?'blue':s<.45?'red':'black'}function addPiste(p){let t=diff(p);pistes.push({p,t,m:Ribbon(p,.85,PC[t]),condition:100})}
-[[[-18,0,20],[-12,0,8],[-8,0,-10]],[[8,0,20],[5,0,7],[1,0,-12]],[[17,0,16],[13,0,5],[9,0,-15]],[[-2,0,25],[-1,0,10],[-4,0,-18]],[[22,0,4],[18,0,-5],[14,0,-22]]].forEach(a=>addPiste(a.map(q=>[q[0],H(q[0],q[2])+.35,q[2]])));
-let lifts=[
- {type:'chairlift',a:[-3,27],b:[-3,-20],phase:0,capacity:4,speed:1},
- {type:'gondola',a:[14,19],b:[14,-19],phase:2,capacity:8,speed:.75}
-],guests=[];for(let i=0;i<60;i++)guests.push({id:i,p:i%pistes.length,t:Math.random(),skill:Math.random(),state:['ski','ski','ski','facility'][i%4],money:80+Math.random()*120,satisfaction:65+Math.random()*30});
-let buildings=[[-2,27,7,4,4],[7,25,4,4,3],[13,27,4,4,3],[20,18,3,3,3],[-16,20,3,3,3]],snow=.32,heat=.08,cash=24800,paused=false,spd=1,mode='select',drawPts=[],yaw=.65,pitch=.72,dist=68,drag=false,lx=0,ly=0,reputation=72;
-function toast(t){let e=document.getElementById('toast');e.textContent=t;e.style.opacity=1;clearTimeout(window.tt);window.tt=setTimeout(()=>e.style.opacity=0,1600)}
-function ui(){sn.textContent=Math.round(55+snow*125)+' cm';gu.textContent=guests.length;pi.textContent=pistes.length;lf.textContent=lifts.length;rep.textContent=Math.round(reputation)+'%';ca.textContent='£'+Math.round(cash).toLocaleString()}
-let liftType='chairlift';
-function setLiftType(t){liftType=t;mode='lift';drawPts=[];toast(t==='chairlift'?'Chairlift selected':t==='gondola'?'Gondola selected':'Magic carpet selected')}
-chair.onclick=()=>setLiftType('chairlift');gondola.onclick=()=>setLiftType('gondola');magic.onclick=()=>setLiftType('magic');
-function modeSet(m){mode=m;drawPts=[];document.querySelectorAll('#bar button').forEach(b=>b.classList.remove('on'));document.getElementById(m==='select'?'sel':m==='piste'?'bp':'bl').classList.add('on');fin.style.display=m==='piste'?'block':'none'}
-sel.onclick=()=>modeSet('select');bp.onclick=()=>modeSet('piste');bl.onclick=()=>modeSet('lift');fin.onclick=()=>{if(drawPts.length>2){addPiste(drawPts.map(q=>[q[0],H(q[0],q[1])+.35,q[1]]));drawPts=[];toast('3D piste built')}else toast('Add 3+ points')};gr.onclick=()=>{pistes.forEach(p=>p.condition=100);cash-=450;toast('Pistes groomed');ui()};nw.onclick=()=>{snow=Math.min(1,snow+.25);heat=Math.max(0,heat-.1);toast('Heavy snowfall');ui()};su.onclick=()=>{heat=Math.min(1,heat+.25);snow=Math.max(0,snow-.08);toast('Sunny weather');ui()};pa.onclick=()=>{paused=!paused;pa.textContent=paused?'PLAY':'PAUSE'};sp.onclick=()=>{spd=spd===1?2:spd===2?4:1;sp.textContent=spd+'×'};
-function point(e){let x=e.clientX/innerWidth*54-27,z=(1-e.clientY/innerHeight)*54-27;return[x,z]}
-c.onpointerdown=e=>{if(mode==='select'){drag=true;lx=e.clientX;ly=e.clientY;return}let [x,z]=point(e);if(mode==='piste'){drawPts.push([x,z]);toast('Piste point '+drawPts.length)}else{drawPts.push([x,z]);if(drawPts.length===2){let cost=liftType==='chairlift'?3500:liftType==='gondola'?8500:1800;
-lifts.push({type:liftType,a:drawPts[0],b:drawPts[1],phase:Math.random()*6,capacity:liftType==='gondola'?8:liftType==='chairlift'?4:20,speed:liftType==='gondola'?.75:liftType==='chairlift'?1:1.3});
-cash-=cost;drawPts=[];toast((liftType==='chairlift'?'Chairlift':liftType==='gondola'?'Gondola':'Magic carpet')+' built — £'+cost.toLocaleString());ui()}}};c.onpointermove=e=>{if(!drag||mode!=='select')return;yaw+=(e.clientX-lx)*.006;pitch=Math.max(.35,Math.min(1.25,pitch-(e.clientY-ly)*.004));lx=e.clientX;ly=e.clientY};c.onpointerup=()=>drag=false;c.onwheel=e=>dist=Math.max(35,Math.min(110,dist+e.deltaY*.06));
-let last=performance.now();function frame(now){let dt=Math.min(.04,(now-last)/16.67);last=now;if(!paused){for(let q of guests){let p=pistes[q.p];q.t+=.0025*dt*spd*(.7+.7*q.skill);if(q.t>=1){q.t=0;q.p=Math.floor(Math.random()*pistes.length);cash+=1.2}}for(let p of pistes)p.condition=Math.max(0,p.condition-.002*dt*spd)}g.enable(g.DEPTH_TEST);g.clearColor(.34,.55,.72,1);g.clear(g.COLOR_BUFFER_BIT|g.DEPTH_BUFFER_BIT);g.useProgram(pg);let eye=[Math.sin(yaw)*Math.cos(pitch)*dist,Math.sin(pitch)*dist,Math.cos(yaw)*Math.cos(pitch)*dist],P=Pers(.82,c.width/c.height,.1,220),V=Look(eye,[0,9,0]);g.uniformMatrix4fv(L.P,false,P);g.uniformMatrix4fv(L.V,false,V);g.uniform3f(L.sun,-.45,1,.3);g.uniform1f(L.snow,snow);g.uniform1f(L.heat,heat);draw(TERR,I());for(let p of pistes){draw(p.m,I()); // piste edge markers
- for(let i=0;i<p.p.length-1;i++){let a=p.p[i],b=p.p[i+1],dx=b[0]-a[0],dz=b[2]-a[2],ll=Math.hypot(dx,dz)||1,nx=-dz/ll,nz=dx/ll;for(let side of [-1,1]){let x=a[0]+nx*side*1.05,z=a[2]+nz*side*1.05,y=H(x,z)+.16;draw(BOX,Mul(T(x,y,z),Sc(.035,.25,.035)));}}}
-for(let b of buildings){let x=b[0],z=b[1],y=H(x,z);draw(BOX,Mul(T(x,y+b[4]/2,z),Sc(b[2],b[4],b[3])));draw(BOX,Mul(T(x,y+b[4]+.4,z),Sc(b[2]*1.12,.55,b[3]*1.12)))}
-for(let l of lifts){
- let ax=l.a[0],az=l.a[1],bx=l.b[0],bz=l.b[1],dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz)||1;
- if(l.type!=='magic'){for(let end of [0,1]){let x=end?bx:ax,z=end?bz:az,y=H(x,z);draw(BOX,Mul(T(x,y+1.1,z),Sc(1.8,.7,1.8)));draw(BOX,Mul(T(x,y+2,z),Sc(1.2,.15,1.2)));}
-   for(let i=0;i<9;i++){let t=i/8,x=ax+dx*t,z=az+dz*t,y=H(x,z);let tower=Sc(.14,2.8,.14);draw(BOX,Mul(T(x,y+1.4,z),tower));draw(BOX,Mul(T(x,y+2.75,z),Sc(.7,.12,.7)));}
-   // cable segments
-   for(let i=0;i<22;i++){let t=i/21,x=ax+dx*t,z=az+dz*t,y=H(x,z)+3.9;let sag=1.0*Math.sin(Math.PI*t);if(i<21){let x2=ax+dx*(i+1)/21,z2=az+dz*(i+1)/21,y2=H(x2,z2)+3.9-1.0*Math.sin(Math.PI*(i+1)/21);draw(Tube([x,y-sag,z],[x2,y2,z2],.035,[.04,.05,.06]));}}
-   let ph=(now/1100+l.phase)%1, count=l.type==='gondola'?7:11;
-   for(let i=0;i<count;i++){let t=(i/count+ph)%1,x=ax+dx*t,z=az+dz*t,y=H(x,z)+3.7;
-      if(l.type==='gondola'){draw(BOX,Mul(T(x,y-.18,z),Sc(.62,.42,.62)));draw(BOX,Mul(T(x,y+.22,z),Sc(.08,.55,.08)))}
-      else {draw(BOX,Mul(T(x,y-.22,z),Sc(.46,.10,.18)));draw(BOX,Mul(T(x,y-.02,z),Sc(.05,.45,.05)));draw(BOX,Mul(T(x+.28,y-.05,z),Sc(.035,.5,.035)));draw(BOX,Mul(T(x-.28,y-.05,z),Sc(.035,.5,.035)));}
-   }
- } else {
-   // magic carpet: low conveyor with repeated moving mats
-   for(let i=0;i<8;i++){let t=i/7,x=ax+dx*t,z=az+dz*t,y=H(x,z)+.55;draw(BOX,Mul(T(x,y,z),Sc(.75,.10,.42)))}
-   let ph=(now/700+l.phase)%1;for(let i=0;i<14;i++){let t=(i/14+ph)%1,x=ax+dx*t,z=az+dz*t,y=H(x,z)+.67;draw(BOX,Mul(T(x,y,z),Sc(.18,.04,.30)))}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#8fc6ea;font-family:Inter,system-ui,-apple-system,sans-serif;color:#fff;touch-action:none}
+#game{position:fixed;inset:0}#ui{position:fixed;inset:0;pointer-events:none}
+.panel{background:rgba(7,18,29,.82);border:1px solid #ffffff25;border-radius:14px;backdrop-filter:blur(14px);box-shadow:0 8px 28px #0018}
+#logo{position:absolute;top:12px;left:12px;padding:10px 14px;font-weight:950;letter-spacing:.15em;font-size:15px}#logo i{font-style:normal;color:#61d9ff}#logo small{display:block;font-size:8px;letter-spacing:.16em;color:#9eb2c2;margin-top:2px}
+#stats{position:absolute;top:12px;right:12px;display:flex;gap:13px;padding:8px 12px}.stat{font-size:8px;color:#9fb4c5}.stat b{display:block;color:#fff;font-size:13px;margin-top:1px}
+#help{position:absolute;left:12px;top:67px;width:270px;padding:10px;font-size:10px;line-height:1.45;color:#b9cad6}#help b{color:#fff}
+#toolbar{position:absolute;bottom:12px;left:12px;right:12px;display:flex;gap:6px;flex-wrap:wrap;padding:7px;pointer-events:auto}button{border:1px solid #ffffff18;background:#132a3d;color:#eef8ff;border-radius:10px;padding:9px 11px;font-weight:800;font-size:10px}button.active{background:#0789b9}button:active{transform:translateY(1px)}
+#toast{position:absolute;top:82px;left:50%;transform:translateX(-50%);padding:9px 13px;opacity:0;transition:.2s;font-size:11px}
+@media(max-width:700px){#help{display:none}.stat:nth-child(n+5){display:none}button{padding:10px 9px}}
+</style></head><body><div id="game"></div><div id="ui">
+<div id="logo" class="panel">SUMMIT <i>VALLEY</i><small>SKI RESORT TYCOON</small></div>
+<div id="stats" class="panel"><div class="stat">SNOW<b id="snow">92 cm</b></div><div class="stat">GUESTS<b id="guests">60</b></div><div class="stat">PISTES<b id="pistes">5</b></div><div class="stat">LIFTS<b id="lifts">2</b></div><div class="stat">REPUTATION<b id="rep">72%</b></div><div class="stat">CASH<b id="cash">£24,800</b></div></div>
+<div id="help" class="panel"><b>SUMMIT VALLEY</b><br>Build a proper alpine resort. Drag to orbit, pinch/scroll to zoom. Guests ski the pistes, queue for lifts, spend money and react to weather. Build pistes, chairlifts, gondolas and facilities.</div>
+<div id="toast" class="panel"></div>
+<div id="toolbar" class="panel">
+<button data-mode="select" class="active">SELECT</button><button data-mode="piste">BUILD PISTE</button><button data-mode="chair">CHAIRLIFT</button><button data-mode="gondola">GONDOLA</button><button data-mode="carpet">CARPET</button><button id="groom">GROOM</button><button id="snowBtn">SNOW</button><button id="sunBtn">SUN</button><button id="pause">PAUSE</button><button id="speed">1×</button><button id="save">SAVE</button><button id="load">LOAD</button>
+</div></div>
+<script type="module">
+import * as THREE from 'https://unpkg.com/three@0.180.0/build/three.module.js';
+
+const root=document.querySelector('#game'), scene=new THREE.Scene();
+scene.background=new THREE.Color(0x91c8eb); scene.fog=new THREE.Fog(0x91c8eb,75,150);
+const camera=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,.1,220);
+camera.position.set(52,46,55);
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;root.appendChild(renderer.domElement);
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+scene.add(new THREE.HemisphereLight(0xdff3ff,0x5c6d72,2.2));
+const sun=new THREE.DirectionalLight(0xffffff,3.2);sun.position.set(-35,70,25);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);scene.add(sun);
+const world=new THREE.Group();scene.add(world);
+
+const state={snow:.32,heat:.08,cash:24800,reputation:72,paused:false,speed:1,mode:'select',liftType:'chair',points:[],pistes:[],lifts:[],guests:[]};
+function height(x,z){const r=Math.hypot(x*.92,z);let y=1.5+27*Math.max(0,1-r/55);y+=7*Math.exp(-((x+15)**2+(z-5)**2)/330)+5*Math.exp(-((x-16)**2+(z+12)**2)/260)-5*Math.exp(-((x+22)**2+(z+17)**2)/250);y+=2*Math.sin(x*.18)*Math.cos(z*.16);return y}
+function slope(x,z){const e=.35;return Math.atan(Math.hypot(height(x+e,z)-height(x-e,z),height(x,z+e)-height(x,z-e))/(2*e))}
+function mat(c,rough=1){return new THREE.MeshStandardMaterial({color:c,roughness:rough})}
+const snowMat=mat(0xeaf4f8),rockMat=mat(0x59666b),pineMat=mat(0x1e4f3b),trunkMat=mat(0x65422a),darkMat=mat(0x18232a);
+
+function mountain(){
+ const N=90,size=112,geo=new THREE.BufferGeometry(),pos=[],norm=[];
+ for(let z=0;z<N-1;z++)for(let x=0;x<N-1;x++){
+  const P=[];for(const [ix,iz] of [[x,z],[x+1,z],[x,z+1],[x+1,z+1]]){const X=-size/2+ix*size/(N-1),Z=-size/2+iz*size/(N-1),Y=height(X,Z);P.push(new THREE.Vector3(X,Y,Z))}
+  for(const tri of [[0,1,2],[1,3,2]]){const a=P[tri[0]],b=P[tri[1]],c=P[tri[2]],n=new THREE.Vector3().crossVectors(new THREE.Vector3().subVectors(b,a),new THREE.Vector3().subVectors(c,a)).normalize();for(const q of tri){const p=P[q];pos.push(p.x,p.y,p.z);norm.push(n.x,n.y,n.z)}}
  }
+ geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setAttribute('normal',new THREE.Float32BufferAttribute(norm,3));
+ const m=new THREE.MeshStandardMaterial({vertexColors:false,roughness:.95});
+ const colors=[];for(let i=0;i<pos.length;i+=3){const y=pos[i+1],x=pos[i],z=pos[i+2],sl=slope(x,z);let c;
+  if(y>22||sl<.30)c=new THREE.Color(0xf2f7fa);else if(sl>.68)c=new THREE.Color(0x566064);else c=new THREE.Color(0x748085);
+  colors.push(c.r,c.g,c.b)}geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));m.vertexColors=true;
+ const mesh=new THREE.Mesh(geo,m);mesh.receiveShadow=true;world.add(mesh);
+}mountain();
+
+function cylinder(r1,r2,h,material,rad=8){return new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,rad),material)}
+function cone(r,h,material,rad=8){return new THREE.Mesh(new THREE.ConeGeometry(r,h,rad),material)}
+function skierMesh(board=false){
+ const g=new THREE.Group(), suit=mat(board?0xe04d3f:0x2d6cdf), black=mat(0x111820), skin=mat(0xf1c7a5), helmet=mat(board?0xf0b52c:0x202b36);
+ const body=cylinder(.20,.25,.62,suit,8);body.position.y=.85;body.rotation.z=.12;g.add(body);
+ const head=new THREE.Mesh(new THREE.SphereGeometry(.18,10,8),skin);head.position.set(0,1.28,0);g.add(head);
+ const hel=new THREE.Mesh(new THREE.SphereGeometry(.20,10,6,0,Math.PI*2,0,Math.PI*.58),helmet);hel.position.set(0,1.33,0);g.add(hel);
+ for(const s of [-1,1]){const leg=cylinder(.055,.065,.52,black,6);leg.position.set(s*.09,.42,0);leg.rotation.z=s*.06;g.add(leg);const ski=new THREE.Mesh(new THREE.BoxGeometry(.055,.035,.72),black);ski.position.set(s*.09,.12,.02);ski.rotation.y=board?0:Math.PI/2;g.add(ski)}
+ if(board){const b=new THREE.Mesh(new THREE.BoxGeometry(.16,.04,.75),black);b.position.y=.13;g.add(b)}
+ else for(const s of [-1,1]){const pole=new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,.72,5),black);pole.position.set(s*.25,.48,.05);pole.rotation.z=s*.32;g.add(pole)}
+ return g;
 }
-for(let i=0;i<85;i++){let x=(i*17.31%54)-27,z=(i*29.17%54)-27;if(Math.hypot(x,z)<11)continue;for(let [m,M] of tree(x,z,.65+(i%3)*.12))draw(m,M)}
-for(let q of guests){let p=pistes[q.p],a=p.p[Math.min(p.p.length-2,Math.floor(q.t*(p.p.length-1)))],b=p.p[Math.min(p.p.length-1,Math.floor(q.t*(p.p.length-1))+1)],t=q.t*(p.p.length-1)%1,x=a[0]+(b[0]-a[0])*t,z=a[2]+(b[2]-a[2])*t,ang=Math.atan2(b[2]-a[2],b[0]-a[0]);for(let [m,M] of skier(x,z,ang,.9))draw(m,M)}
-for(let q of drawPts)draw(BOX,Mul(T(q[0],H(q[0],q[1])+.8,q[1]),Sc(.3,.3,.3)));ui();requestAnimationFrame(frame)}requestAnimationFrame(frame);
+const skierProto=skierMesh(false), boardProto=skierMesh(true);
 
-/* v0.2 additions: local sandbox save/load + PWA offline support */
-const saveBtn=document.createElement('button');saveBtn.textContent='SAVE';saveBtn.id='saveGame';
-const loadBtn=document.createElement('button');loadBtn.textContent='LOAD';loadBtn.id='loadGame';const manageBtn=document.createElement('button');manageBtn.textContent='RESORT';manageBtn.onclick=()=>toast('Reputation '+Math.round(reputation)+'% • '+guests.length+' guests • £'+Math.round(cash).toLocaleString());
-document.getElementById('bar').append(saveBtn,loadBtn,manageBtn);
-saveBtn.onclick=()=>{localStorage.setItem('summitValleySave',JSON.stringify({cash,snow,heat,reputation,pistes:pistes.map(p=>({p:p.p,t:p.t,condition:p.condition})),lifts,buildings}));toast('Resort saved on this iPhone')};
-loadBtn.onclick=()=>{let z=localStorage.getItem('summitValleySave');if(!z)return toast('No save found');try{let q=JSON.parse(z);cash=q.cash;snow=q.snow;heat=q.heat;reputation=q.reputation||72;pistes=q.pistes.map(p=>({...p,m:Ribbon(p.p,.85,PC[p.t])}));lifts=q.lifts;buildings=q.buildings;toast('Resort loaded');ui()}catch(e){toast('Save could not be loaded')}};
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
+function tree(x,z,s=1){const g=new THREE.Group(),y=height(x,z),tr=cylinder(.13*s,.18*s,1.5*s,trunkMat,7);tr.position.y=.75*s;g.add(tr);
+ for(let i=0;i<3;i++){const q=cone((1.0-i*.23)*s,1.55*s,pineMat,9);q.position.y=1.5*s+i*.85*s;g.add(q)}g.position.set(x,y,z);world.add(g)}
+for(let i=0;i<95;i++){const a=i*2.399,x=((i*31.7)%100)-50,z=((i*47.3)%100)-50;if(Math.hypot(x,z)>10&&height(x,z)<23)tree(x,z,.65+(i%4)*.12)}
 
+function chalet(x,z,scale=1,label='LODGE'){const g=new THREE.Group(),y=height(x,z);
+ const base=new THREE.Mesh(new THREE.BoxGeometry(5*scale,2.5*scale,4*scale),mat(0xb87948));base.position.y=1.25*scale;g.add(base);
+ const roof=new THREE.Mesh(new THREE.ConeGeometry(3.8*scale,2.6*scale,4),mat(0x26333a));roof.rotation.y=Math.PI/4;roof.position.y=3.8*scale;g.add(roof);
+ for(const s of [-1,1]){const win=new THREE.Mesh(new THREE.BoxGeometry(1*scale,.9*scale,.08),mat(0x8bd9ed));win.position.set(s*1.4*scale,1.45*scale,-2.03*scale);g.add(win)}
+ const sign=new THREE.Mesh(new THREE.BoxGeometry(2*scale,.4*scale,.06),mat(0xe8c46a));sign.position.set(0,2.25*scale,-2.08*scale);g.add(sign);
+ g.position.set(x,y,z);g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});world.add(g);return g}
+chalet(-3,29,1.15,'BASE'),chalet(10,27,.82,'CAFE'),chalet(22,17,.7,'HOTEL'),chalet(-19,18,.68,'LODGE');
+
+function pisteMesh(points,color){
+ const shape=new THREE.Shape(),w=.95;const left=[],right=[];
+ points.forEach((p,i)=>{const a=points[Math.max(0,i-1)],b=points[Math.min(points.length-1,i+1)],dx=b.x-a.x,dz=b.z-a.z,l=Math.hypot(dx,dz)||1,nx=-dz/l,nz=dx/l;left.push(new THREE.Vector3(p.x+nx*w,height(p.x+nx*w,p.z+nz*w)+.22,p.z+nz*w));right.push(new THREE.Vector3(p.x-nx*w,height(p.x-nx*w,p.z-nz*w)+.22,p.z-nz*w))});
+ const pos=[],norm=[];for(let i=0;i<points.length-1;i++){for(const q of [left[i],left[i+1],right[i],left[i+1],right[i+1],right[i]]){pos.push(q.x,q.y,q.z);norm.push(0,1,0)}}const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setAttribute('normal',new THREE.Float32BufferAttribute(norm,3));const m=new THREE.MeshStandardMaterial({color,roughness:.88});const mesh=new THREE.Mesh(geo,m);mesh.receiveShadow=true;world.add(mesh);return mesh}
+function grade(points){let total=0;for(let i=1;i<points.length;i++)total+=slope(points[i].x,points[i].z);const a=total/(points.length-1);return a<.22?['green',0x35c76f]:a<.34?['blue',0x3686ef]:a<.49?['red',0xef4a4a]:['black',0x20242a]}
+function addPiste(points){const [type,col]=grade(points);state.pistes.push({points,type,mesh:pisteMesh(points,col),condition:100});toast(type.toUpperCase()+' piste built')}
+[[[-18,18],[-13,7],[-8,-10]],[[8,20],[5,8],[1,-14]],[[17,17],[13,5],[9,-16]],[[-3,26],[-2,10],[-4,-19]],[[22,5],[18,-6],[14,-23]]].forEach(a=>addPiste(a.map(([x,z])=>new THREE.Vector3(x,height(x,z)+.35,z))));
+
+function cable(a,b){
+ const pa=new THREE.Vector3(a.x,height(a.x,a.z)+6,a.z),pb=new THREE.Vector3(b.x,height(b.x,b.z)+6,b.z),curve=new THREE.LineCurve3(pa,pb),geo=new THREE.TubeGeometry(curve,24,.055,6,false),line=new THREE.Mesh(geo,darkMat);world.add(line)}
+function lift(a,b,type){
+ const g=new THREE.Group(),cost=type==='gondola'?8500:type==='chair'?3500:1800;
+ for(let i=0;i<9;i++){const t=i/8,x=THREE.MathUtils.lerp(a.x,b.x,t),z=THREE.MathUtils.lerp(a.z,b.z,t),y=height(x,z),tower=cylinder(.16,.2,5,darkMat,8);tower.position.set(x,y+2.5,z);g.add(tower);const arm=new THREE.Mesh(new THREE.BoxGeometry(1.1,.14,.14),darkMat);arm.position.set(x,y+5,z);g.add(arm)}
+ cable(a,b);const stationA=chalet(a.x,a.z,.55,'STATION'),stationB=chalet(b.x,b.z,.55,'STATION');
+ for(let i=0;i<10;i++){const t=i/10,carrier=type==='gondola'?new THREE.Mesh(new THREE.BoxGeometry(.9,.55,.75),mat(0xe8edf0)):new THREE.Mesh(new THREE.BoxGeometry(.95,.12,.32),mat(0x202a31));carrier.userData.t=t;carrier.userData.type=type;carrier.position.set(THREE.MathUtils.lerp(a.x,b.x,t),height(THREE.MathUtils.lerp(a.x,b.x,t),THREE.MathUtils.lerp(a.z,b.z,t))+4.7,THREE.MathUtils.lerp(a.z,b.z,t));g.add(carrier)}
+ g.userData={a,b,type,cost,phase:Math.random()*10};world.add(g);state.lifts.push(g);state.cash-=cost;ui();toast((type==='chair'?'Chairlift':type==='gondola'?'Gondola':'Magic carpet')+' built — £'+cost.toLocaleString())}
+lift({x:-3,z:27},{x:-3,z:-20},'chair');lift({x:14,z:20},{x:14,z:-19},'gondola');
+
+for(let i=0;i<65;i++){const q=(i%state.pistes.length),g=skierMesh(i%5===0);g.scale.setScalar(.58);g.userData={p:q,t:Math.random(),speed:.0018+Math.random()*.002};world.add(g);state.guests.push(g)}
+
+function ui(){snow.textContent=Math.round(55+state.snow*125)+' cm';guests.textContent=state.guests.length;pistes.textContent=state.pistes.length;lifts.textContent=state.lifts.length;rep.textContent=Math.round(state.reputation)+'%';cash.textContent='£'+Math.round(state.cash).toLocaleString()}
+function toast(t){const e=document.querySelector('#toast');e.textContent=t;e.style.opacity=1;clearTimeout(window._toast);window._toast=setTimeout(()=>e.style.opacity=0,1500)}
+function setMode(m){state.mode=m;state.points=[];document.querySelectorAll('#toolbar button[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===m));toast(m==='piste'?'Tap points down the mountain, then tap the final point again.':'Mode: '+m)}
+document.querySelectorAll('#toolbar button[data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+renderer.domElement.addEventListener('pointerdown',e=>{renderer.domElement.setPointerCapture(e.pointerId);drag={x:e.clientX,y:e.clientY};if(state.mode==='piste'||state.mode==='chair'||state.mode==='gondola'||state.mode==='carpet'){const v=pick(e);if(!v)return;state.points.push(v);if(state.mode==='piste'&&state.points.length>=3&&e.detail>=2){addPiste(state.points);state.points=[]}else if(state.mode!=='piste'&&state.points.length===2){lift(state.points[0],state.points[1],state.mode);state.points=[]}}});
+let drag=null;
+renderer.domElement.addEventListener('pointermove',e=>{if(!drag||state.mode!=='select')return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;camera.position.applyAxisAngle(new THREE.Vector3(0,1,0),-dx*.006);const r=Math.hypot(camera.position.x,camera.position.z);camera.position.x=camera.position.x/r*77;camera.position.z=camera.position.z/r*77;camera.position.y=Math.max(25,Math.min(70,camera.position.y-dy*.08));camera.lookAt(0,10,0);drag={x:e.clientX,y:e.clientY}});
+renderer.domElement.addEventListener('pointerup',()=>drag=null);
+function pick(e){const rect=renderer.domElement.getBoundingClientRect(),mouse=new THREE.Vector2((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1),ray=new THREE.Raycaster();ray.setFromCamera(mouse,camera);const plane=new THREE.Plane(new THREE.Vector3(0,1,0),-0);const p=new THREE.Vector3();ray.ray.intersectPlane(plane,p);return new THREE.Vector3(p.x,height(p.x,p.z)+.3,p.z)}
+document.querySelector('#groom').onclick=()=>{state.pistes.forEach(p=>p.condition=100);state.cash-=450;toast('All pistes groomed');ui()};
+document.querySelector('#snowBtn').onclick=()=>{state.snow=Math.min(1,state.snow+.25);state.heat=Math.max(0,state.heat-.1);toast('Heavy snowfall')};
+document.querySelector('#sunBtn').onclick=()=>{state.heat=Math.min(1,state.heat+.25);state.snow=Math.max(0,state.snow-.08);toast('Sunny weather')};
+document.querySelector('#pause').onclick=e=>{state.paused=!state.paused;e.currentTarget.textContent=state.paused?'PLAY':'PAUSE'};
+document.querySelector('#speed').onclick=e=>{state.speed=state.speed===1?2:state.speed===2?4:1;e.currentTarget.textContent=state.speed+'×'};
+document.querySelector('#save').onclick=()=>{localStorage.setItem('svSave',JSON.stringify({cash:state.cash,snow:state.snow,heat:state.heat,reputation:state.reputation}));toast('Resort saved')};
+document.querySelector('#load').onclick=()=>{const x=JSON.parse(localStorage.getItem('svSave')||'null');if(!x)return toast('No save found');Object.assign(state,x);ui();toast('Resort loaded')};
+let last=performance.now();
+function animate(now){requestAnimationFrame(animate);const dt=Math.min(.04,(now-last)/16.67);last=now;if(!state.paused){state.guests.forEach(g=>{const p=state.pistes[g.userData.p],idx=Math.min(p.points.length-2,Math.floor(g.userData.t*(p.points.length-1))),a=p.points[idx],b=p.points[idx+1],f=g.userData.t*(p.points.length-1)%1;const x=THREE.MathUtils.lerp(a.x,b.x,f),z=THREE.MathUtils.lerp(a.z,b.z,f);g.position.set(x,height(x,z)+.38,z);g.rotation.y=Math.atan2(b.x-a.x,b.z-a.z);g.userData.t+=g.userData.speed*state.speed*dt;if(g.userData.t>1){g.userData.t=0;g.userData.p=Math.floor(Math.random()*state.pistes.length);state.cash+=1.2}});state.lifts.forEach(l=>l.children.forEach((o,i)=>{if(o.userData&&o.userData.t!==undefined){o.userData.t=(o.userData.t+.0007*state.speed*dt)%1;const t=o.userData.t,x=THREE.MathUtils.lerp(l.userData.a.x,l.userData.b.x,t),z=THREE.MathUtils.lerp(l.userData.a.z,l.userData.b.z,t);o.position.set(x,height(x,z)+4.7,z)}}));state.cash+=.03*state.guests.length*state.speed*dt}ui();renderer.render(scene,camera)}
+camera.lookAt(0,10,0);ui();requestAnimationFrame(animate);
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 </script></body></html>
