@@ -174,38 +174,127 @@ const placedBuildings=[];
 const constructionCosts={hotel:85000,chalet:28000,lodge:42000,restaurant:36000,bar:22000,cafe:14000,skiShop:18000,rental:24000,toilet:9000,ticket:16000,parking:12000};
 
 function worldPointFromScreen(clientX,clientY){
- const r=canvas.getBoundingClientRect(),sx=(clientX-r.left)*canvas.width/r.width,sy=(clientY-r.top)*canvas.height/r.height;
- const near=camera.screenToWorld(sx,sy,0.1),far=camera.screenToWorld(sx,sy,1000);
- const dx=far.x-near.x,dy=far.y-near.y,dz=far.z-near.z;
- let lo=0,hi=1;
- for(let i=0;i<18;i++){const t=(lo+hi)/2,x=near.x+dx*t,z=near.z+dz*t,y=near.y+dy*t;if(y>height(x,z))lo=t;else hi=t}
- const t=(lo+hi)/2;return new pc.Vec3(near.x+dx*t,height(near.x+dx*t,near.z+dz*t),near.z+dz*t);
+ const r=canvas.getBoundingClientRect();
+ const sx=(clientX-r.left)*(canvas.width/r.width);
+ const sy=(clientY-r.top)*(canvas.height/r.height);
+ const near=camera.screenToWorld(sx,sy,0.01);
+ const far=camera.screenToWorld(sx,sy,1000);
+ const ray=new pc.Vec3(far.x-near.x,far.y-near.y,far.z-near.z);
+ let t=(18-near.y)/(ray.y||-0.001);
+ if(t<0)t=1;
+ t=Math.max(0,Math.min(1,t));
+ let x=near.x+ray.x*t,z=near.z+ray.z*t;
+ // Refine the horizontal hit against the actual sculpted mountain.
+ for(let i=0;i<5;i++){
+   const yy=height(x,z),tt=(yy-near.y)/(ray.y||-0.001);
+   if(tt>=0&&tt<=1){t=tt;x=near.x+ray.x*t;z=near.z+ray.z*t;}
+ }
+ return new pc.Vec3(x,height(x,z),z);
 }
 function clearGhost(){if(ghost){ghost.destroy();ghost=null}}
+function gableRoof(parent,w,d,h,overhang=1){
+ const verts=[
+  -w/2,-h/2,-d/2, w/2,-h/2,-d/2, 0,h/2,-d/2,
+  -w/2,-h/2,d/2,  w/2,-h/2,d/2,  0,h/2,d/2
+ ];
+ const inds=[0,1,2,3,5,4,0,3,4,0,4,1,1,4,5,1,5,2,2,5,3,2,3,0];
+ return meshEntity("architectural gable roof",verts,inds,roof);
+}
+function windowUnit(parent,x,y,z,w=1.15,h=1.25){
+ box("deep window reveal",[w+.18,h+.18,.22],[x,y,z-.06],trunk,parent);
+ box("panoramic glass",[w,h,.08],[x,y,z+.06],glass,parent);
+ box("window mullion", [.07,h,.09],[x,y,z+.11],trunk,parent);
+ box("window mullion",[w,.07,.09],[x,y,z+.11],trunk,parent);
+}
+function exteriorLight(parent,x,y,z){
+ sphere("warm exterior lamp",[.10,.10,.10],[x,y,z],warm,parent);
+}
 function createDetailedBuilding(type,x,z,preview=false){
- const y=height(x,z),root=new pc.Entity((preview?"Ghost ":"")+type);root.setLocalPosition(x,y,z);app.root.addChild(root);
- const scale=type==="hotel"?1.25:type==="chalet"?1:type==="lodge"?.92:type==="restaurant"?1.05:type==="bar"?.82:type==="cafe"?.68:type==="skiShop"?.72:type==="rental"?.9:type==="toilet"?.48:type==="ticket"?.65:1;
- root.setLocalScale(scale,scale,scale);
- const wall=type==="hotel"?timber:type==="restaurant"?trunk:timber;
- const bodyW=type==="hotel"?10:type==="restaurant"?8:type==="chalet"?7.2:6;
- const bodyD=type==="hotel"?7:type==="restaurant"?6.5:5.5;
- box("building stone base",[bodyW+.3,.65,bodyD+.3],[0,.33,0],rockLight,root);
- box("building body",[bodyW,3.5,bodyD],[0,2.15,0],wall,root);
- // timber framing
- for(const xx of[-bodyW*.36,bodyW*.36])box("timber frame",[.22,3.25,.16],[xx,2.1,bodyD/2+.1],trunk,root);
- for(const yy of[1.15,3.05])box("timber frame",[bodyW,.18,.16],[0,yy,bodyD/2+.1],trunk,root);
- const roofA=box("roof slope",[bodyW*.62,.48,bodyD+1.0],[-bodyW*.25,4.25,0],roof,root);roofA.setLocalEulerAngles(0,0,-28);
- const roofB=box("roof slope",[bodyW*.62,.48,bodyD+1.0],[bodyW*.25,4.25,0],roof,root);roofB.setLocalEulerAngles(0,0,28);
- const snowA=box("roof snow",[bodyW*.61,.20,bodyD+.95],[-bodyW*.25,4.58,0],roofSnow,root);snowA.setLocalEulerAngles(0,0,-28);
- const snowB=box("roof snow",[bodyW*.61,.20,bodyD+.95],[bodyW*.25,4.58,0],roofSnow,root);snowB.setLocalEulerAngles(0,0,28);
- const windows=type==="cafe"||type==="bar"?4:Math.min(6,Math.round(bodyW/1.6));
- for(let i=0;i<windows;i++){const xx=(i-(windows-1)/2)*1.5;box("window",[1.05,1.05,.12],[xx,2.35,bodyD/2+.12],glass,root);box("window glow",[.86,.72,.05],[xx,2.35,bodyD/2+.19],warm,root)}
- box("door",[1.05,2.05,.18],[0,1.1,bodyD/2+.16],roof,root);
- if(type==="hotel"||type==="chalet"||type==="restaurant"||type==="bar"){box("terrace",[bodyW*.55,.16,1.4],[0,.55,bodyD/2+.75],trunk,root);for(const xx of[-bodyW*.3,0,bodyW*.3]){box("table",[.55,.12,.55],[xx,.72,bodyD/2+1.05],trunk,root);box("chair",[.35,.5,.35],[xx,1.0,bodyD/2+1.55],timber,root)}}
- if(type==="hotel"){for(const xx of[-3,0,3])box("balcony",[2.1,.14,1.05],[xx,3.0,bodyD/2+.55],trunk,root)}
- if(type==="bar"||type==="cafe"){box("awning",[bodyW*.58,.14,1.1],[0,3.55,bodyD/2+.5],roof,root)}
- cyl("chimney",[.55,1.2,.55],[bodyW*.28,5.0,0],rock,root);
- if(preview){root.findComponents("render").forEach(r=>r.castShadows=false);root.opacity=0.55}
+ const y=height(x,z),root=new pc.Entity((preview?"Ghost ":"")+type);
+ root.setLocalPosition(x,y,z);app.root.addChild(root);
+ const cfg={
+  hotel:{w:11,d:8,h:4.5,scale:1.12},
+  chalet:{w:8,d:6,h:4.0,scale:1},
+  lodge:{w:7.5,d:6,h:3.8,scale:.95},
+  restaurant:{w:9.5,d:7,h:4.0,scale:1},
+  bar:{w:7,d:5.8,h:3.7,scale:.9},
+  cafe:{w:6.2,d:5.2,h:3.5,scale:.78},
+  skiShop:{w:7,d:5.5,h:3.5,scale:.82},
+  rental:{w:8.5,d:6,h:3.6,scale:.9},
+  toilet:{w:5,d:4,h:2.8,scale:.68},
+  ticket:{w:5.8,d:4.5,h:3.0,scale:.72},
+  parking:{w:6,d:3.5,h:2.6,scale:.75}
+ }[type]||{w:7,d:5,h:3.5,scale:1};
+ root.setLocalScale(cfg.scale,cfg.scale,cfg.scale);
+
+ // Foundation, stone plinth and timber-framed alpine walls.
+ box("stone foundation",[cfg.w+.5,.75,cfg.d+.5],[0,.38,0],rockLight,root);
+ box("main timber structure",[cfg.w,3.25,cfg.d],[0,2.05,0],timber,root);
+ for(const xx of[-cfg.w*.43,cfg.w*.43])box("corner timber",[.28,3.35,.28],[xx,2.05,cfg.d/2+.08],trunk,root);
+ for(const yy of[1.05,2.98])box("horizontal timber",[cfg.w,.20,.20],[0,yy,cfg.d/2+.11],trunk,root);
+ for(const xx of[-cfg.w*.25,0,cfg.w*.25])box("vertical facade timber",[.16,3.0,.18],[xx,2.02,cfg.d/2+.12],trunk,root);
+
+ // Proper gable roof: a triangular alpine silhouette rather than two floating slabs.
+ const roofEnt=gableRoof(root,cfg.w+1.5,cfg.d+1.0,cfg.h);
+ roofEnt.setPosition(0,4.05,0);
+ const snowCap=gableRoof(root,cfg.w+1.65,cfg.d+1.12,cfg.h+.12);
+ snowCap.setPosition(0,4.20,0);snowCap.render.material=roofSnow;
+
+ // Front glazing and doors.
+ const count=Math.max(2,Math.min(6,Math.round(cfg.w/1.45)));
+ for(let i=0;i<count;i++){
+  const xx=(i-(count-1)/2)*Math.min(1.55,cfg.w/count*.92);
+  windowUnit(root,xx,2.30,cfg.d/2+.16,Math.min(1.25,cfg.w/count*.72),1.18);
+  exteriorLight(root,xx,1.18,cfg.d/2+.28);
+ }
+ box("main entrance surround",[1.55,2.35,.28],[0,1.22,cfg.d/2+.20],rock,root);
+ box("main entrance door",[1.15,2.05,.10],[0,1.15,cfg.d/2+.38],glass,root);
+ box("door handle",[.05,.05,.05],[.38,1.15,cfg.d/2+.45],yellow,root);
+
+ // Side windows make the building read in 3D from the player camera.
+ for(const side of[-1,1]){
+  for(const yy of[1.55,2.85])windowUnit(root,side*(cfg.w/2+.09),yy,0,1.0, .72);
+ }
+ // Chimneys, snow caps and a visible roof ridge.
+ cyl("masonry chimney",[.62,1.35,.62],[cfg.w*.28,5.05,0],rock,root);
+ box("chimney cap",[.78,.12,.78],[cfg.w*.28,5.73,0],roofSnow,root);
+ cyl("ridge beam",[.12,.12,.12],[0,4.82,0],trunk,root);
+
+ if(["hotel","chalet","lodge","restaurant","bar"].includes(type)){
+  box("covered terrace",[cfg.w*.64,.18,1.35],[0,.72,cfg.d/2+.78],trunk,root);
+  for(const xx of[-cfg.w*.24,0,cfg.w*.24]){
+   box("terrace table",[.62,.10,.62],[xx,.90,cfg.d/2+1.18],trunk,root);
+   for(const sx of[-.34,.34])box("terrace chair",[.28,.55,.30],[xx+sx,.98,cfg.d/2+1.22],timber,root);
+  }
+  if(type==="hotel"||type==="chalet"){
+   for(const xx of[-cfg.w*.28,0,cfg.w*.28]){
+    box("upper balcony",[1.75,.15,1.05],[xx,3.10,cfg.d/2+.62],trunk,root);
+    box("balcony rail",[1.75,.55,.08],[xx,3.38,cfg.d/2+1.12],steel,root);
+   }
+  }
+ }
+ if(type==="bar"||type==="cafe"){
+  box("apres awning",[cfg.w*.62,.16,1.25],[0,3.48,cfg.d/2+.58],roof,root);
+  for(const xx of[-1.25,1.25])cyl("awning support",[.07,1.25,.07],[xx,2.82,cfg.d/2+.88],steel,root);
+ }
+ if(type==="skiShop"||type==="rental"){
+  box("shop display",[cfg.w*.58,1.05,.18],[0,1.55,cfg.d/2+.30],glass,root);
+  for(const xx of[-1.4,-.7,0,.7,1.4])box("ski rack",[.08,1.4,.08],[xx,1.65,cfg.d/2+.45],steel,root);
+ }
+ if(type==="ticket"){
+  box("ticket canopy",[cfg.w*.7,.18,1.0],[0,3.1,cfg.d/2+.52],roof,root);
+ }
+ if(type==="toilet"){
+  box("facility sign",[1.4,.55,.10],[0,3.15,cfg.d/2+.15],glass,root);
+ }
+ if(type==="parking"){
+  for(let i=-2;i<=2;i++)box("parking bay",[2.0,.035,3.0],[i*1.25,0.82,0],snowGrey,root);
+ }
+ if(preview){
+  root.render.enabled=true;
+  root.findComponents("render").forEach(r=>r.castShadows=false);
+  root._preview=true;
+ }
  return root;
 }
 function renderBuildItems(cat){
@@ -268,14 +357,21 @@ document.getElementById("weatherBtn").onclick=()=>{weather=(weather+1)%3;const n
 document.getElementById("resetBtn").onclick=()=>{placedBuildings.forEach(b=>b.entity&&b.entity.destroy());placedBuildings.length=0;cash=250000;localStorage.removeItem("summit-valley-save");toast("New season started")};
 window.addEventListener("beforeunload",saveGame);
 
+window.addEventListener("error",e=>{console.error(e.error||e.message);toast("Game error: "+(e.message||"unknown error"));});
+window.addEventListener("unhandledrejection",e=>{console.error(e.reason);toast("Game error — reload the resort");});
+
+
 const camera=new pc.Entity("Camera");camera.addComponent("camera",{clearColor:new pc.Color(.63,.77,.88),fov:46});app.root.addChild(camera);
 let yaw=-31,pitch=32,distance=112,target=new pc.Vec3(0,19,4);
 function updateCamera(){const yr=yaw*Math.PI/180,pr=pitch*Math.PI/180;camera.setPosition(target.x+Math.sin(yr)*Math.cos(pr)*distance,target.y+Math.sin(pr)*distance,target.z+Math.cos(yr)*Math.cos(pr)*distance);camera.lookAt(target)}
 updateCamera();
 const pointers=new Map();let lastDist=0;
-canvas.addEventListener("pointerdown",e=>{if(buildMode){draggingBuild=true;return}canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,[e.clientX,e.clientY])});
+canvas.addEventListener("pointerdown",e=>{
+ if(buildMode){draggingBuild=true;canvas.setPointerCapture(e.pointerId);return}
+ canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,[e.clientX,e.clientY])
+});
 canvas.addEventListener("pointermove",e=>{if(buildMode){const p=worldPointFromScreen(e.clientX,e.clientY);const buildingIds=["hotel","chalet","lodge","restaurant","bar","cafe","skiShop","rental","toilet","ticket","parking"];if(buildSelection&&buildingIds.includes(buildSelection.id)){if(!ghost)ghost=createDetailedBuilding(buildSelection.id,p.x,p.z,true);else ghost.setPosition(p.x,height(p.x,p.z),p.z)}else if(draggingBuild&&buildSelection&&(buildSelection.id.toLowerCase().includes("piste")||["chair","gondola","tbar","magic"].includes(buildSelection.id))){if(buildStart&&!ghost){ghost=new pc.Entity("Route preview");app.root.addChild(ghost)}}return}if(!pointers.has(e.pointerId))return;const old=pointers.get(e.pointerId);pointers.set(e.pointerId,[e.clientX,e.clientY]);if(pointers.size===1){yaw-=(e.clientX-old[0])*.22;pitch=Math.max(14,Math.min(72,pitch+(e.clientY-old[1])*.18));updateCamera()}else if(pointers.size===2){const a=[...pointers.values()],d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(lastDist)distance=Math.max(48,Math.min(160,distance-(d-lastDist)*.35));lastDist=d;updateCamera()}});
-canvas.addEventListener("pointerup",e=>{if(buildMode){draggingBuild=false;const p=worldPointFromScreen(e.clientX,e.clientY);if(buildSelection&&["hotel","chalet","lodge","restaurant","bar","cafe","skiShop","rental","toilet","ticket","parking"].includes(buildSelection.id))placeBuilding(p);else if(buildSelection&&(buildSelection.id.toLowerCase().includes("piste")||["chair","gondola","tbar","magic"].includes(buildSelection.id)))beginRoute(buildSelection.id,p);return}pointers.delete(e.pointerId);lastDist=0});
+canvas.addEventListener("pointerup",e=>{if(buildMode){e.preventDefault();draggingBuild=false;const p=worldPointFromScreen(e.clientX,e.clientY);if(buildSelection&&["hotel","chalet","lodge","restaurant","bar","cafe","skiShop","rental","toilet","ticket","parking"].includes(buildSelection.id))placeBuilding(p);else if(buildSelection&&(buildSelection.id.toLowerCase().includes("piste")||["chair","gondola","tbar","magic"].includes(buildSelection.id)))beginRoute(buildSelection.id,p);return}pointers.delete(e.pointerId);lastDist=0});
 canvas.addEventListener("wheel",e=>{distance=Math.max(48,Math.min(160,distance+e.deltaY*.06));updateCamera()},{passive:true});
 window.addEventListener("resize",()=>app.resizeCanvas(canvas.clientWidth,canvas.clientHeight));
 setTimeout(()=>{document.getElementById("loading").style.opacity="0";setTimeout(()=>document.getElementById("loading").remove(),600);toast("Summit Valley — Alpine terrain rebuilt")},1400);
