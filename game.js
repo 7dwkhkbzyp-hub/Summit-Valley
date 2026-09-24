@@ -136,7 +136,118 @@ function chooseRoute(g){const choices=[0,1,2,3,4].filter(x=>x!==g._route);g._rou
 let cash=250000,paused=false,weather=0;
 app.on("update",dt=>{if(paused)return;const now=performance.now()/1000;guests.forEach(g=>{g._path+=dt*g._speed;if(g._path>=1)chooseRoute(g);const p=samplePath(paths[g._route],g._path),p2=samplePath(paths[g._route],Math.min(.999,g._path+.012)),turn=Math.atan2(p2[0]-p[0],p2[1]-p[1])*180/Math.PI;const phase=now*(5.2+g._speed*22)+g._phase, carve=Math.sin(phase), sway=Math.sin(phase*.5);g.setLocalPosition(p[0],height(p[0],p[1])+.04,p[1]);g.setLocalEulerAngles(0,turn,Math.sin(phase*.7)*3.5);if(g._anim){const a=g._anim;const tuck=20+Math.abs(carve)*7;a.body.setLocalEulerAngles(tuck*.32,0,-12+carve*5);a.head.setLocalEulerAngles(tuck*.16,0,-carve*3);a.helmet.setLocalEulerAngles(tuck*.16,0,-carve*3);a.armL.setLocalEulerAngles(0,0,-30+carve*10);a.armR.setLocalEulerAngles(0,0,30+carve*10);a.legL.setLocalEulerAngles(0,0,-9-carve*7);a.legR.setLocalEulerAngles(0,0,9+carve*7);a.poleL.setLocalEulerAngles(12+carve*8,0,-18-carve*6);a.poleR.setLocalEulerAngles(12-carve*8,0,18-carve*6);a.pack.setLocalPosition(0,1.10,-.19+Math.abs(carve)*.015)}});[...lift1,...lift2,...lift3].forEach(c=>{const cycle=(c._phase+now*.055)%2,t=cycle<=1?cycle:2-cycle;c.setPosition(pc.math.lerp(c._a[0],c._b[0],t),pc.math.lerp(c._a[1],c._b[1],t),pc.math.lerp(c._a[2],c._b[2],t))});document.getElementById("guests").textContent=String(90+Math.floor((now*2)%120));document.getElementById("cash").textContent=Math.floor(cash).toLocaleString()});
 
-let tool="select";document.querySelectorAll(".tool").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".tool").forEach(x=>x.classList.remove("active"));b.classList.add("active");tool=b.dataset.tool;toast(tool==="select"?"Select and inspect your resort":"Build mode: "+b.textContent.trim())}));
+
+const buildCatalog={
+ lodging:[
+  {id:"hotel",name:"Alpine Grand Hotel",price:85000,desc:"Large timber-and-stone hotel with balconies and warm interiors."},
+  {id:"chalet",name:"Alpine Chalet",price:28000,desc:"Premium mountain chalet with snow roof and outdoor terrace."},
+  {id:"lodge",name:"Summit Lodge",price:42000,desc:"Compact lodge for skiers beside a piste."}
+ ],
+ food:[
+  {id:"restaurant",name:"Mountain Restaurant",price:36000,desc:"Full-service restaurant with terrace and panoramic windows."},
+  {id:"bar",name:"Après Ski Bar",price:22000,desc:"Warm timber bar with outdoor heaters and glowing windows."},
+  {id:"cafe",name:"Mountain Café",price:14000,desc:"Small café for coffee, pastries and quick stops."}
+ ],
+ retail:[
+  {id:"skiShop",name:"Ski & Board Shop",price:18000,desc:"Retail and equipment service building."},
+  {id:"rental",name:"Rental Centre",price:24000,desc:"Equipment rental hub near the village."},
+  {id:"toilet",name:"Mountain Toilets",price:9000,desc:"Essential guest facility."}
+ ],
+ transport:[
+  {id:"ticket",name:"Lift Ticket Office",price:16000,desc:"Guest ticket and information centre."},
+  {id:"parking",name:"Alpine Parking",price:12000,desc:"Parking area for visiting guests."}
+ ],
+ lifts:[
+  {id:"chair",name:"High-Speed Chairlift",price:115000,desc:"Six-seat detachable chairlift."},
+  {id:"gondola",name:"Mountain Gondola",price:185000,desc:"Eight-person gondola connection."},
+  {id:"tbar",name:"T-Bar",price:38000,desc:"Low-cost surface lift for beginner terrain."},
+  {id:"magic",name:"Magic Carpet",price:18000,desc:"Beginner conveyor lift."}
+ ],
+ pistes:[
+  {id:"greenPiste",name:"Green Piste",price:18000,desc:"Wide gentle beginner run."},
+  {id:"bluePiste",name:"Blue Piste",price:26000,desc:"Balanced intermediate piste."},
+  {id:"redPiste",name:"Red Piste",price:36000,desc:"Steeper advanced run."},
+  {id:"blackPiste",name:"Black Piste",price:48000,desc:"Expert terrain with steep gradient."}
+]};
+let buildMode=null,buildSelection=null,buildStart=null,ghost=null,draggingBuild=false;
+const placedBuildings=[];
+const constructionCosts={hotel:85000,chalet:28000,lodge:42000,restaurant:36000,bar:22000,cafe:14000,skiShop:18000,rental:24000,toilet:9000,ticket:16000,parking:12000};
+
+function worldPointFromScreen(clientX,clientY){
+ const r=canvas.getBoundingClientRect(),sx=(clientX-r.left)*canvas.width/r.width,sy=(clientY-r.top)*canvas.height/r.height;
+ const near=camera.screenToWorld(sx,sy,0.1),far=camera.screenToWorld(sx,sy,1000);
+ const dx=far.x-near.x,dy=far.y-near.y,dz=far.z-near.z;
+ let lo=0,hi=1;
+ for(let i=0;i<18;i++){const t=(lo+hi)/2,x=near.x+dx*t,z=near.z+dz*t,y=near.y+dy*t;if(y>height(x,z))lo=t;else hi=t}
+ const t=(lo+hi)/2;return new pc.Vec3(near.x+dx*t,height(near.x+dx*t,near.z+dz*t),near.z+dz*t);
+}
+function clearGhost(){if(ghost){ghost.destroy();ghost=null}}
+function createDetailedBuilding(type,x,z,preview=false){
+ const y=height(x,z),root=new pc.Entity((preview?"Ghost ":"")+type);root.setLocalPosition(x,y,z);app.root.addChild(root);
+ const scale=type==="hotel"?1.25:type==="chalet"?1:type==="lodge"?.92:type==="restaurant"?1.05:type==="bar"?.82:type==="cafe"?.68:type==="skiShop"?.72:type==="rental"?.9:type==="toilet"?.48:type==="ticket"?.65:1;
+ root.setLocalScale(scale,scale,scale);
+ const wall=type==="hotel"?timber:type==="restaurant"?trunk:timber;
+ const bodyW=type==="hotel"?10:type==="restaurant"?8:type==="chalet"?7.2:6;
+ const bodyD=type==="hotel"?7:type==="restaurant"?6.5:5.5;
+ box("building stone base",[bodyW+.3,.65,bodyD+.3],[0,.33,0],rockLight,root);
+ box("building body",[bodyW,3.5,bodyD],[0,2.15,0],wall,root);
+ // timber framing
+ for(const xx of[-bodyW*.36,bodyW*.36])box("timber frame",[.22,3.25,.16],[xx,2.1,bodyD/2+.1],trunk,root);
+ for(const yy of[1.15,3.05])box("timber frame",[bodyW,.18,.16],[0,yy,bodyD/2+.1],trunk,root);
+ const roofA=box("roof slope",[bodyW*.62,.48,bodyD+1.0],[-bodyW*.25,4.25,0],roof,root);roofA.setLocalEulerAngles(0,0,-28);
+ const roofB=box("roof slope",[bodyW*.62,.48,bodyD+1.0],[bodyW*.25,4.25,0],roof,root);roofB.setLocalEulerAngles(0,0,28);
+ const snowA=box("roof snow",[bodyW*.61,.20,bodyD+.95],[-bodyW*.25,4.58,0],roofSnow,root);snowA.setLocalEulerAngles(0,0,-28);
+ const snowB=box("roof snow",[bodyW*.61,.20,bodyD+.95],[bodyW*.25,4.58,0],roofSnow,root);snowB.setLocalEulerAngles(0,0,28);
+ const windows=type==="cafe"||type==="bar"?4:Math.min(6,Math.round(bodyW/1.6));
+ for(let i=0;i<windows;i++){const xx=(i-(windows-1)/2)*1.5;box("window",[1.05,1.05,.12],[xx,2.35,bodyD/2+.12],glass,root);box("window glow",[.86,.72,.05],[xx,2.35,bodyD/2+.19],warm,root)}
+ box("door",[1.05,2.05,.18],[0,1.1,bodyD/2+.16],roof,root);
+ if(type==="hotel"||type==="chalet"||type==="restaurant"||type==="bar"){box("terrace",[bodyW*.55,.16,1.4],[0,.55,bodyD/2+.75],trunk,root);for(const xx of[-bodyW*.3,0,bodyW*.3]){box("table",[.55,.12,.55],[xx,.72,bodyD/2+1.05],trunk,root);box("chair",[.35,.5,.35],[xx,1.0,bodyD/2+1.55],timber,root)}}
+ if(type==="hotel"){for(const xx of[-3,0,3])box("balcony",[2.1,.14,1.05],[xx,3.0,bodyD/2+.55],trunk,root)}
+ if(type==="bar"||type==="cafe"){box("awning",[bodyW*.58,.14,1.1],[0,3.55,bodyD/2+.5],roof,root)}
+ cyl("chimney",[.55,1.2,.55],[bodyW*.28,5.0,0],rock,root);
+ if(preview){root.findComponents("render").forEach(r=>r.castShadows=false);root.opacity=0.55}
+ return root;
+}
+function renderBuildItems(cat){
+ const el=document.getElementById("buildItems");if(!el)return;el.innerHTML="";
+ (buildCatalog[cat]||[]).forEach(item=>{
+  const b=document.createElement("button");b.className="build-card";b.innerHTML="<b>"+item.name+"</b><small>£"+item.price.toLocaleString()+" · "+item.desc+"</small>";
+  b.onclick=()=>selectBuildItem(item);el.appendChild(b);
+ });
+}
+function selectBuildItem(item){
+ clearGhost();buildSelection=item;buildMode=item.id;
+ document.querySelectorAll(".build-card").forEach(x=>x.classList.remove("selected"));
+ const info=document.getElementById("buildInfo");if(info)info.innerHTML="<b>"+item.name+"</b><br>Cost £"+item.price.toLocaleString()+"<br>"+item.desc+"<br><br>Tap the mountain to place.";
+ toast("Place "+item.name);
+}
+function openBuild(cat="lodging"){document.getElementById("buildPanel").classList.add("open");renderBuildItems(cat)}
+function closeBuild(){document.getElementById("buildPanel").classList.remove("open");clearGhost();buildSelection=null;buildMode=null;buildStart=null}
+function spend(amount){if(cash<amount){toast("Not enough funds");return false}cash-=amount;return true}
+function placeBuilding(p){
+ if(!buildSelection)return;
+ if(!spend(buildSelection.price))return;
+ const e=createDetailedBuilding(buildSelection.id,p.x,p.z,false);placedBuildings.push({type:buildSelection.id,x:p.x,z:p.z,entity:e,cost:buildSelection.price});
+ toast(buildSelection.name+" constructed");
+ document.getElementById("buildInfo").innerHTML="Built. Select another item or continue expanding.";
+}
+function beginRoute(type,p){
+ if(!buildStart){buildStart=p;toast("Tap the destination point");return}
+ const a=buildStart,b=p,dist=Math.hypot(b.x-a.x,b.z-a.z);
+ if(dist<8){toast("Route is too short");return}
+ const cost=buildSelection.price+Math.round(dist*700);
+ if(!spend(cost))return;
+ if(type==="piste"){const colour=buildSelection.id==="greenPiste"?green:buildSelection.id==="bluePiste"?blue:buildSelection.id==="redPiste"?red:black;
+  const path={name:buildSelection.name+" "+(paths.length+1),color:colour,width:buildSelection.id==="blackPiste"?3.8:5.0,pts:[[a.x,a.z],[(a.x*2+b.x)/3,(a.z*2+b.z)/3],[b.x,b.z]]};
+  paths.push(path);ribbon(path);toast(path.name+" built");
+ }else{makeLift("Player "+buildSelection.name, [a.x,a.z],[b.x,b.z],buildSelection.id==="gondola"?8:8,buildSelection.id==="gondola"?"gondola":"chair");toast(buildSelection.name+" constructed")}
+ buildStart=null;
+}
+
+let tool="select";document.querySelectorAll(".tool").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".tool").forEach(x=>x.classList.remove("active"));b.classList.add("active");tool=b.dataset.tool;if(tool==="building"){openBuild("lodging")}else if(tool==="lift"){openBuild("transport");renderBuildItems("lifts")}else if(tool==="piste"){openBuild("transport");renderBuildItems("pistes")}else{closeBuild();toast(tool==="select"?"Select and inspect your resort":"Build mode: "+b.textContent.trim())}}));
+document.querySelectorAll(".build-tab").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".build-tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");renderBuildItems(b.dataset.cat)}));
+document.getElementById("closeBuild").onclick=()=>closeBuild();
+document.querySelectorAll("[data-menu]").forEach(b=>b.addEventListener("click",()=>{document.getElementById("mainMenu").classList.add("hidden");if(b.dataset.menu==="sandbox"){cash=9999999;toast("Sandbox mode — unlimited funds")}else if(b.dataset.menu==="scenarios"){toast("Scenarios framework ready — first scenario coming soon")}else if(b.dataset.menu==="settings"){toast("Settings panel coming next")}else{toast("Welcome to Summit Valley")}}));
 function toast(t){const e=document.getElementById("toast");e.textContent=t;e.classList.add("show");clearTimeout(window.__toast);window.__toast=setTimeout(()=>e.classList.remove("show"),1600)}
 document.getElementById("pauseBtn").onclick=()=>{paused=!paused;document.getElementById("pauseBtn").textContent=paused?"▶":"Ⅱ";toast(paused?"Game paused":"Game resumed")};
 document.getElementById("weatherBtn").onclick=()=>{weather=(weather+1)%3;const n=["Clear","Snowfall","Storm"];document.getElementById("weather").textContent=n[weather];toast(n[weather]+" conditions")};
@@ -147,9 +258,9 @@ let yaw=-31,pitch=32,distance=112,target=new pc.Vec3(0,19,4);
 function updateCamera(){const yr=yaw*Math.PI/180,pr=pitch*Math.PI/180;camera.setPosition(target.x+Math.sin(yr)*Math.cos(pr)*distance,target.y+Math.sin(pr)*distance,target.z+Math.cos(yr)*Math.cos(pr)*distance);camera.lookAt(target)}
 updateCamera();
 const pointers=new Map();let lastDist=0;
-canvas.addEventListener("pointerdown",e=>{canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,[e.clientX,e.clientY])});
-canvas.addEventListener("pointermove",e=>{if(!pointers.has(e.pointerId))return;const old=pointers.get(e.pointerId);pointers.set(e.pointerId,[e.clientX,e.clientY]);if(pointers.size===1){yaw-=(e.clientX-old[0])*.22;pitch=Math.max(14,Math.min(72,pitch+(e.clientY-old[1])*.18));updateCamera()}else if(pointers.size===2){const a=[...pointers.values()],d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(lastDist)distance=Math.max(48,Math.min(160,distance-(d-lastDist)*.35));lastDist=d;updateCamera()}});
-canvas.addEventListener("pointerup",e=>{pointers.delete(e.pointerId);lastDist=0});
+canvas.addEventListener("pointerdown",e=>{if(buildMode){draggingBuild=true;return}canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,[e.clientX,e.clientY])});
+canvas.addEventListener("pointermove",e=>{if(buildMode){if(draggingBuild&&buildSelection&&(buildSelection.id.includes("Piste")||buildSelection.id.toLowerCase().includes("piste")||["chair","gondola","tbar","magic"].includes(buildSelection.id))){const p=worldPointFromScreen(e.clientX,e.clientY);if(buildStart&&!ghost){ghost=new pc.Entity("Route preview");app.root.addChild(ghost)}}return}if(!pointers.has(e.pointerId))return;const old=pointers.get(e.pointerId);pointers.set(e.pointerId,[e.clientX,e.clientY]);if(pointers.size===1){yaw-=(e.clientX-old[0])*.22;pitch=Math.max(14,Math.min(72,pitch+(e.clientY-old[1])*.18));updateCamera()}else if(pointers.size===2){const a=[...pointers.values()],d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(lastDist)distance=Math.max(48,Math.min(160,distance-(d-lastDist)*.35));lastDist=d;updateCamera()}});
+canvas.addEventListener("pointerup",e=>{if(buildMode){draggingBuild=false;const p=worldPointFromScreen(e.clientX,e.clientY);if(buildSelection&&["hotel","chalet","lodge","restaurant","bar","cafe","skiShop","rental","toilet","ticket","parking"].includes(buildSelection.id))placeBuilding(p);else if(buildSelection&&(buildSelection.id.toLowerCase().includes("piste")||["chair","gondola","tbar","magic"].includes(buildSelection.id)))beginRoute(buildSelection.id,p);return}pointers.delete(e.pointerId);lastDist=0});
 canvas.addEventListener("wheel",e=>{distance=Math.max(48,Math.min(160,distance+e.deltaY*.06));updateCamera()},{passive:true});
 window.addEventListener("resize",()=>app.resizeCanvas(canvas.clientWidth,canvas.clientHeight));
 setTimeout(()=>{document.getElementById("loading").style.opacity="0";setTimeout(()=>document.getElementById("loading").remove(),600);toast("Summit Valley — Alpine terrain rebuilt")},1400);
