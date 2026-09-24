@@ -21,12 +21,26 @@ jobs:
       image: barichello/godot-ci:4.4.1
     steps:
       - uses: actions/checkout@v4
+
       - name: Validate Godot project
-        run: godot --headless --path GodotProject --editor --quit
-      - name: Export Web
+        working-directory: GodotProject
+        run: godot --headless --editor --quit
+
+      - name: Export Godot Web build
+        working-directory: GodotProject
         run: |
-          mkdir -p GodotProject/build/web
-          godot --headless --path GodotProject --export-release "Web" build/web/index.html
+          rm -rf build/web
+          mkdir -p build/web
+          godot --headless --export-release "Web" build/web/index.html
+
+      - name: Verify export
+        working-directory: GodotProject
+        run: |
+          test -f build/web/index.html
+          test -f build/web/index.pck
+          test -f build/web/index.js
+          test -f build/web/index.wasm
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
