@@ -124,8 +124,10 @@ func terrain_height(x: float, z: float) -> float:
     var peak_c = 38.0 * exp(-((x + 2.0) ** 2 / 1250.0 + (z + 57.0) ** 2 / 1800.0))
     var valley = -24.0 * exp(-(x ** 2 / 2100.0 + (z - 20.0) ** 2 / 2600.0))
     var shoulder = 7.0 * exp(-((x + 65.0) ** 2 / 1700.0 + (z + 20.0) ** 2 / 5000.0))
+    var ridge_a = 5.5 * exp(-((x + 6.0) ** 2 / 900.0 + (z + 8.0) ** 2 / 4200.0)) * sin(z * 0.10)
+    var ridge_b = 4.0 * exp(-((x - 55.0) ** 2 / 1300.0 + (z + 5.0) ** 2 / 3600.0)) * cos(z * 0.08)
     var gullies = 2.8 * sin(x * 0.075 + z * 0.018) * cos(z * 0.052)
-    return max(1.0, 6.0 + peak_a + peak_b + peak_c + valley + shoulder + gullies)
+    return max(1.0, 6.0 + peak_a + peak_b + peak_c + valley + shoulder + ridge_a + ridge_b + gullies)
 
 func _setup_environment() -> void:
     world_env = WorldEnvironment.new()
@@ -182,7 +184,7 @@ func _build_mountain() -> void:
     add_child(terrain_mesh)
 
     # Forest is concentrated in believable lower/mid-mountain bands.
-    for i in range(165):
+    for i in range(235):
         var x := rng.randf_range(-84.0,84.0)
         var z := rng.randf_range(-84.0,84.0)
         var y := terrain_height(x,z)
@@ -223,6 +225,20 @@ func _build_mountain() -> void:
         rock.scale=Vector3(rng.randf_range(0.8,1.5),rng.randf_range(0.8,1.4),rng.randf_range(0.8,1.5))
         scenery_root.add_child(rock)
 
+    # Operational ski-resort equipment: snowmaking line and groomer staging.
+    var cannon_positions = [
+        Vector3(-18,terrain_height(-18,-18)+0.25,-18), Vector3(-8,terrain_height(-8,-2)+0.25,-2),
+        Vector3(10,terrain_height(10,-20)+0.25,-20), Vector3(23,terrain_height(23,-17)+0.25,-17),
+        Vector3(30,terrain_height(30,-31)+0.25,-31), Vector3(-31,terrain_height(-31,-27)+0.25,-27),
+        Vector3(-42,terrain_height(-42,-42)+0.25,-42), Vector3(7,terrain_height(7,12)+0.25,12)
+    ]
+    for p in cannon_positions:
+        _snow_cannon(p)
+
+    _groomer(Vector3(-12,terrain_height(-12,29)+0.35,29), 0.35)
+    _groomer(Vector3(17,terrain_height(17,-8)+0.35,-8), -0.55)
+    _groomer(Vector3(-34,terrain_height(-34,-18)+0.35,-18), 1.0)
+
     # A few groomed snow shelves beside the main village make the resort
     # footprint read from the overhead management camera.
     for p in [
@@ -259,17 +275,23 @@ func _mountain_material()->StandardMaterial3D:
 
 func _detailed_pine()->Node3D:
     var root:=Node3D.new()
-    var trunk:=_cylinder(0.20,2.8,Color("#4b382c"))
-    trunk.position.y=1.4
+    var trunk:=_cylinder(0.22,3.4,Color("#49362b"))
+    trunk.position.y=1.7
     root.add_child(trunk)
-    for layer in range(4):
-        var r:=2.4-float(layer)*0.42
-        var cone:=_cone(r,3.0,Color("#205445").lerp(Color("#2f7358"),float(layer)/4.0))
-        cone.position.y=2.1+float(layer)*1.55
+    for layer in range(5):
+        var f:=float(layer)/4.0
+        var r:=2.75-f*1.55
+        var h:=3.1-f*0.25
+        var cone:=_cone(r,h,Color("#173f34").lerp(Color("#2e6b50"),f*0.7))
+        cone.position.y=2.0+float(layer)*1.35
         root.add_child(cone)
-    var snow_cap:=_cone(1.7,1.0,Color("#eef5f7"))
-    snow_cap.position.y=7.0
-    root.add_child(snow_cap)
+        if layer < 4:
+            var snow:=_cone(r*0.58,0.48,Color("#eaf1f3"))
+            snow.position.y=cone.position.y+h*0.27
+            root.add_child(snow)
+    var top:=_cone(0.65,1.5,Color("#225441"))
+    top.position.y=8.0
+    root.add_child(top)
     return root
 
 func _snowfield(radius:float)->Node3D:
@@ -284,11 +306,15 @@ func _snowfield(radius:float)->Node3D:
 
 func _rock_cluster()->Node3D:
     var root:=Node3D.new()
-    for i in range(4):
-        var rock:=_cone(rng.randf_range(1.4,3.8),rng.randf_range(2.5,6.0),Color("#667277"))
-        rock.position=Vector3(rng.randf_range(-3.0,3.0),rng.randf_range(0,1.0),rng.randf_range(-2.5,2.5))
-        rock.rotation=Vector3(rng.randf_range(-0.2,0.2),rng.randf_range(0,TAU),rng.randf_range(-0.2,0.2))
+    for i in range(5):
+        var rock:=_cone(rng.randf_range(1.2,3.2),rng.randf_range(2.2,5.2),Color("#566267").lerp(Color("#7b8588"),rng.randf()))
+        rock.position=Vector3(rng.randf_range(-3.5,3.5),rng.randf_range(0,0.8),rng.randf_range(-3.0,3.0))
+        rock.rotation=Vector3(rng.randf_range(-0.35,0.35),rng.randf_range(0,TAU),rng.randf_range(-0.35,0.35))
         root.add_child(rock)
+        if rng.randf() < 0.55:
+            var cap:=_cone(rock.scale.x*0.55,0.35,Color("#dfe7e9"))
+            cap.position=rock.position+Vector3.UP*2.0
+            root.add_child(cap)
     return root
 
 func _build_initial_resort() -> void:
@@ -1044,6 +1070,52 @@ func _place_lift(pos:Vector2)->void:
     _lift(p+Vector3.UP*2.5,end,"CHAIRLIFT")
     guest_capacity=min(MAX_GUESTS,guest_capacity+20)
     _toast("New lift opened. Capacity +20.")
+
+func _snow_cannon(pos:Vector3)->void:
+    var root:=Node3D.new()
+    root.position=pos
+    var base:=_cylinder(0.42,0.22,Color("#30383d"))
+    base.position.y=0.12
+    root.add_child(base)
+    var mast:=_cylinder(0.12,1.55,Color("#879399"))
+    mast.position.y=0.9
+    root.add_child(mast)
+    var barrel:=_cylinder(0.18,1.7,Color("#d6dde0"))
+    barrel.position=Vector3(0,1.72,0)
+    barrel.rotation.z=deg_to_rad(-28.0)
+    root.add_child(barrel)
+    var nozzle:=_sphere(0.26,Color("#e7edf0"))
+    nozzle.position=Vector3(0.38,2.42,0)
+    root.add_child(nozzle)
+    var control:=_box(Vector3(0.55,0.7,0.35),Color("#36535a"))
+    control.position=Vector3(-0.45,0.75,0)
+    root.add_child(control)
+    scenery_root.add_child(root)
+
+func _groomer(pos:Vector3,angle:float)->void:
+    var root:=Node3D.new()
+    root.position=pos
+    root.rotation.y=angle
+    var body:=_box(Vector3(3.6,1.15,2.0),Color("#c63135"))
+    body.position.y=0.85
+    root.add_child(body)
+    var cab:=_box(Vector3(1.65,1.15,1.65),Color("#25333a"))
+    cab.position=Vector3(0.45,1.95,0)
+    root.add_child(cab)
+    var glass:=_box(Vector3(1.2,0.65,0.08),Color("#6fadc0"))
+    glass.position=Vector3(0.45,2.05,-0.84)
+    root.add_child(glass)
+    var blade:=_box(Vector3(3.2,0.35,0.32),Color("#d4d9db"))
+    blade.position=Vector3(0,-0.02,-1.15)
+    blade.rotation.y=deg_to_rad(-8.0)
+    root.add_child(blade)
+    for x in [-1.25,1.25]:
+        for z in [-0.62,0.62]:
+            var wheel:=_cylinder(0.42,0.28,Color("#20272b"))
+            wheel.position=Vector3(x,0.45,z)
+            wheel.rotation.z=deg_to_rad(90.0)
+            root.add_child(wheel)
+    scenery_root.add_child(root)
 
 func _building(title:String,pos:Vector3,cost:float)->void:
     buildings.append({"name":title,"pos":pos,"cost":cost})
