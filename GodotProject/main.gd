@@ -474,13 +474,10 @@ func _lift(a:Vector3,b:Vector3,type_name:String)->void:
                     var cabin:=_asset_mesh("res://assets/gondola/asset.obj",Vector3(0.9,0.9,0.9))
                     cabin.position.y=-2.35
                     carrier.add_child(cabin)
-                    var glass_back:=_box(Vector3(2.5,1.15,0.12),Color("#72b9d7"))
-                    glass_back.position=Vector3(0,-2.65,1.11)
-                    carrier.add_child(glass_back)
-                    var door:=_box(Vector3(0.9,1.35,0.08),Color("#3f5965"))
-                    door.position=Vector3(0,-2.6,-1.18)
-                    carrier.add_child(door)
                 else:
+                    var chair_mesh:=_asset_mesh("res://assets/chair/asset.obj",Vector3(1.0,1.0,1.0))
+                    chair_mesh.position.y=-0.05
+                    carrier.add_child(chair_mesh)
                     var spreader:=_beam(Vector3(0,-1.35,0),Vector3(0,-1.9,0),0.075,Color("#303438"))
                     carrier.add_child(spreader)
                     var seat:=_box(Vector3(2.9,0.26,1.08),Color("#b72e34"))
