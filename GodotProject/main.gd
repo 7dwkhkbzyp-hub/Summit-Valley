@@ -325,10 +325,19 @@ func _lift_station(pos:Vector3,side:String,type_name:String)->void:
     var glass:=_box(Vector3(10,4.5,5.8),Color("#8dc9df"))
     glass.position.y=4.2
     root.add_child(glass)
-    var wheel:=_cylinder(2.0,0.45,Color("#20252a"))
-    wheel.position=Vector3(0,6.8,0)
-    wheel.rotation_degrees.x=90
-    root.add_child(wheel)
+    if type_name!="MAGIC CARPET":
+        var wheel:=_cylinder(2.0,0.45,Color("#20252a"))
+        wheel.position=Vector3(0,6.8,0)
+        wheel.rotation_degrees.x=90
+        root.add_child(wheel)
+    else:
+        var carpet:=_box(Vector3(11,0.2,5),Color("#273238"))
+        carpet.position.y=1.05
+        root.add_child(carpet)
+        for i in range(8):
+            var tread:=_box(Vector3(0.12,0.08,4.7),Color("#d7dce0"))
+            tread.position=Vector3(-4.5+i*1.3,1.17,0)
+            root.add_child(tread)
     var label:=Label3D.new()
     label.text=type_name+" "+side
     label.font_size=20
@@ -452,8 +461,24 @@ func _animate_guests(dt:float)->void:
                 if ct<0.055 and not carrier.has_meta("rider"):
                     carrier.set_meta("rider",true)
                     g["carrier"]=carrier
-                    g["state"]="lift"
+                    g["state"]="boarding"
+                    g["board_timer"]=0.6
                     break
+        elif state=="boarding":
+            var carrier:Node3D=g["carrier"]
+            if not is_instance_valid(carrier):
+                g["state"]="queue"
+                continue
+            g["board_timer"]=float(g.get("board_timer",0.0))-dt
+            g["node"].global_position=carrier.global_position+Vector3(0,-0.45,-1.5)
+            g["node"].rotation.y=carrier.rotation.y
+            if float(g["board_timer"])<=0.0:
+                g["node"].reparent(carrier,true)
+                g["node"].position=Vector3(0,-2.35,0)
+                g["node"].rotation=Vector3.ZERO
+                carrier.set_meta("rider_node",g["node"])
+                g["state"]="lift"
+
         elif state=="lift":
             var carrier:Node3D=g["carrier"]
             if not is_instance_valid(carrier):
@@ -466,7 +491,9 @@ func _animate_guests(dt:float)->void:
             var ct:float=carrier.get_meta("lift_t")
             if ct>0.94:
                 var li:int=g["lift"]
-                carrier.set_meta("rider",false)
+                carrier.set_meta("rider_node",null)
+                g["node"].reparent(guest_root,true)
+                g["node"].global_position=data["b"]+Vector3(0,1.0,2.0)
                 g["carrier"]=null
                 var next_route:=_piste_near_lift_top(li)
                 g["route"]=next_route if next_route>=0 else rng.randi_range(0,pistes.size()-1)
