@@ -134,7 +134,7 @@ function makeSkier(i,route,t,type){
 for(let i=0;i<44;i++)makeSkier(i,i%paths.length,(i*.173+Math.random()*.22)%1,i%7===0?"snowboarder":"skier");
 function chooseRoute(g){const choices=[0,1,2,3,4].filter(x=>x!==g._route);g._route=choices[Math.floor(Math.random()*choices.length)];g._path=Math.random()*.12;g._speed=.022+Math.random()*.04}
 let cash=250000,paused=false,weather=0;
-app.on("update",dt=>{if(paused)return;const now=performance.now()/1000;guests.forEach(g=>{g._path+=dt*g._speed;if(g._path>=1)chooseRoute(g);const p=samplePath(paths[g._route],g._path),p2=samplePath(paths[g._route],Math.min(.999,g._path+.012)),turn=Math.atan2(p2[0]-p[0],p2[1]-p[1])*180/Math.PI;const phase=now*(5.2+g._speed*22)+g._phase, carve=Math.sin(phase), sway=Math.sin(phase*.5);g.setLocalPosition(p[0],height(p[0],p[1])+.04,p[1]);g.setLocalEulerAngles(0,turn,Math.sin(phase*.7)*3.5);if(g._anim){const a=g._anim;const tuck=20+Math.abs(carve)*7;a.body.setLocalEulerAngles(tuck*.32,0,-12+carve*5);a.head.setLocalEulerAngles(tuck*.16,0,-carve*3);a.helmet.setLocalEulerAngles(tuck*.16,0,-carve*3);a.armL.setLocalEulerAngles(0,0,-30+carve*10);a.armR.setLocalEulerAngles(0,0,30+carve*10);a.legL.setLocalEulerAngles(0,0,-9-carve*7);a.legR.setLocalEulerAngles(0,0,9+carve*7);a.poleL.setLocalEulerAngles(12+carve*8,0,-18-carve*6);a.poleR.setLocalEulerAngles(12-carve*8,0,18-carve*6);a.pack.setLocalPosition(0,1.10,-.19+Math.abs(carve)*.015)}});[...lift1,...lift2,...lift3].forEach(c=>{const cycle=(c._phase+now*.055)%2,t=cycle<=1?cycle:2-cycle;c.setPosition(pc.math.lerp(c._a[0],c._b[0],t),pc.math.lerp(c._a[1],c._b[1],t),pc.math.lerp(c._a[2],c._b[2],t))});document.getElementById("guests").textContent=String(90+Math.floor((now*2)%120));document.getElementById("cash").textContent=Math.floor(cash).toLocaleString()});
+app.on("update",dt=>{if(paused)return;const now=performance.now()/1000;gameClock=(gameClock+dt*.015)%24;const daylight=Math.max(0,Math.min(1,Math.sin((gameClock-6)/24*Math.PI*2)));sun.light.intensity=.55+2.45*daylight;app.scene.ambientLight=new pc.Color(.12+.22*daylight,.18+.25*daylight,.28+.28*daylight);guests.forEach(g=>{g._path+=dt*g._speed;if(g._path>=1)chooseRoute(g);const p=samplePath(paths[g._route],g._path),p2=samplePath(paths[g._route],Math.min(.999,g._path+.012)),turn=Math.atan2(p2[0]-p[0],p2[1]-p[1])*180/Math.PI;const phase=now*(5.2+g._speed*22)+g._phase, carve=Math.sin(phase), sway=Math.sin(phase*.5);g.setLocalPosition(p[0],height(p[0],p[1])+.04,p[1]);g.setLocalEulerAngles(0,turn,Math.sin(phase*.7)*3.5);if(g._anim){const a=g._anim;const tuck=20+Math.abs(carve)*7;a.body.setLocalEulerAngles(tuck*.32,0,-12+carve*5);a.head.setLocalEulerAngles(tuck*.16,0,-carve*3);a.helmet.setLocalEulerAngles(tuck*.16,0,-carve*3);a.armL.setLocalEulerAngles(0,0,-30+carve*10);a.armR.setLocalEulerAngles(0,0,30+carve*10);a.legL.setLocalEulerAngles(0,0,-9-carve*7);a.legR.setLocalEulerAngles(0,0,9+carve*7);a.poleL.setLocalEulerAngles(12+carve*8,0,-18-carve*6);a.poleR.setLocalEulerAngles(12-carve*8,0,18-carve*6);a.pack.setLocalPosition(0,1.10,-.19+Math.abs(carve)*.015)}});[...lift1,...lift2,...lift3].forEach(c=>{const cycle=(c._phase+now*.055)%2,t=cycle<=1?cycle:2-cycle;c.setPosition(pc.math.lerp(c._a[0],c._b[0],t),pc.math.lerp(c._a[1],c._b[1],t),pc.math.lerp(c._a[2],c._b[2],t))});document.getElementById("guests").textContent=String(90+Math.floor((now*2)%120));cash+=dt*.75;document.getElementById("cash").textContent=Math.floor(cash).toLocaleString();const timeEl=document.querySelector(".bottom-panel small");if(timeEl){const h=Math.floor(gameClock),m=Math.floor((gameClock-h)*60);timeEl.textContent="Alpine Region • Day 1 • "+String(h).padStart(2,"0")+":"+String(m).padStart(2,"0")}});
 
 
 const buildCatalog={
@@ -224,8 +224,22 @@ function selectBuildItem(item){
 function openBuild(cat="lodging"){document.getElementById("buildPanel").classList.add("open");renderBuildItems(cat)}
 function closeBuild(){document.getElementById("buildPanel").classList.remove("open");clearGhost();buildSelection=null;buildMode=null;buildStart=null}
 function spend(amount){if(cash<amount){toast("Not enough funds");return false}cash-=amount;return true}
+
+function saveGame(){
+ const data={cash,weather,buildings:placedBuildings.map(b=>({type:b.type,x:b.x,z:b.z,cost:b.cost})),savedAt:Date.now()};
+ localStorage.setItem("summit-valley-save",JSON.stringify(data));toast("Resort saved");
+}
+function loadGame(){
+ try{
+  const raw=localStorage.getItem("summit-valley-save");if(!raw){toast("No saved resort found");return}
+  const data=JSON.parse(raw);cash=data.cash||250000;weather=data.weather||0;
+  (data.buildings||[]).forEach(b=>{const e=createDetailedBuilding(b.type,b.x,b.z,false);placedBuildings.push({...b,entity:e})});
+  document.getElementById("weather").textContent=["Clear","Snowfall","Storm"][weather];toast("Resort loaded");
+ }catch(err){toast("Save could not be loaded");console.error(err)}
+}
+let gameClock=9.25;
 function placeBuilding(p){
- if(!buildSelection)return;
+ if(!buildSelection)return;clearGhost();
  if(!spend(buildSelection.price))return;
  const e=createDetailedBuilding(buildSelection.id,p.x,p.z,false);placedBuildings.push({type:buildSelection.id,x:p.x,z:p.z,entity:e,cost:buildSelection.price});
  toast(buildSelection.name+" constructed");
@@ -247,11 +261,12 @@ function beginRoute(type,p){
 let tool="select";document.querySelectorAll(".tool").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".tool").forEach(x=>x.classList.remove("active"));b.classList.add("active");tool=b.dataset.tool;if(tool==="building"){openBuild("lodging")}else if(tool==="lift"){openBuild("transport");renderBuildItems("lifts")}else if(tool==="piste"){openBuild("transport");renderBuildItems("pistes")}else{closeBuild();toast(tool==="select"?"Select and inspect your resort":"Build mode: "+b.textContent.trim())}}));
 document.querySelectorAll(".build-tab").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".build-tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");renderBuildItems(b.dataset.cat)}));
 document.getElementById("closeBuild").onclick=()=>closeBuild();
-document.querySelectorAll("[data-menu]").forEach(b=>b.addEventListener("click",()=>{document.getElementById("mainMenu").classList.add("hidden");if(b.dataset.menu==="sandbox"){cash=9999999;toast("Sandbox mode — unlimited funds")}else if(b.dataset.menu==="scenarios"){toast("Scenarios framework ready — first scenario coming soon")}else if(b.dataset.menu==="settings"){toast("Settings panel coming next")}else{toast("Welcome to Summit Valley")}}));
+document.querySelectorAll("[data-menu]").forEach(b=>b.addEventListener("click",()=>{document.getElementById("mainMenu").classList.add("hidden");if(b.dataset.menu==="sandbox"){cash=9999999;toast("Sandbox mode — unlimited funds")}else if(b.dataset.menu==="continue"){loadGame()}else if(b.dataset.menu==="scenarios"){toast("Scenarios framework ready — first scenario coming soon")}else if(b.dataset.menu==="settings"){toast("Settings panel coming next")}else{cash=250000;toast("New season — build your resort")}}));
 function toast(t){const e=document.getElementById("toast");e.textContent=t;e.classList.add("show");clearTimeout(window.__toast);window.__toast=setTimeout(()=>e.classList.remove("show"),1600)}
 document.getElementById("pauseBtn").onclick=()=>{paused=!paused;document.getElementById("pauseBtn").textContent=paused?"▶":"Ⅱ";toast(paused?"Game paused":"Game resumed")};
 document.getElementById("weatherBtn").onclick=()=>{weather=(weather+1)%3;const n=["Clear","Snowfall","Storm"];document.getElementById("weather").textContent=n[weather];toast(n[weather]+" conditions")};
-document.getElementById("resetBtn").onclick=()=>{cash=250000;toast("New season started")};
+document.getElementById("resetBtn").onclick=()=>{cash=250000;placedBuildings.splice(0).forEach(()=>{});localStorage.removeItem("summit-valley-save");toast("New season started")};
+window.addEventListener("beforeunload",saveGame);
 
 const camera=new pc.Entity("Camera");camera.addComponent("camera",{clearColor:new pc.Color(.63,.77,.88),fov:46});app.root.addChild(camera);
 let yaw=-31,pitch=32,distance=112,target=new pc.Vec3(0,19,4);
@@ -259,7 +274,7 @@ function updateCamera(){const yr=yaw*Math.PI/180,pr=pitch*Math.PI/180;camera.set
 updateCamera();
 const pointers=new Map();let lastDist=0;
 canvas.addEventListener("pointerdown",e=>{if(buildMode){draggingBuild=true;return}canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,[e.clientX,e.clientY])});
-canvas.addEventListener("pointermove",e=>{if(buildMode){if(draggingBuild&&buildSelection&&(buildSelection.id.includes("Piste")||buildSelection.id.toLowerCase().includes("piste")||["chair","gondola","tbar","magic"].includes(buildSelection.id))){const p=worldPointFromScreen(e.clientX,e.clientY);if(buildStart&&!ghost){ghost=new pc.Entity("Route preview");app.root.addChild(ghost)}}return}if(!pointers.has(e.pointerId))return;const old=pointers.get(e.pointerId);pointers.set(e.pointerId,[e.clientX,e.clientY]);if(pointers.size===1){yaw-=(e.clientX-old[0])*.22;pitch=Math.max(14,Math.min(72,pitch+(e.clientY-old[1])*.18));updateCamera()}else if(pointers.size===2){const a=[...pointers.values()],d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(lastDist)distance=Math.max(48,Math.min(160,distance-(d-lastDist)*.35));lastDist=d;updateCamera()}});
+canvas.addEventListener("pointermove",e=>{if(buildMode){const p=worldPointFromScreen(e.clientX,e.clientY);const buildingIds=["hotel","chalet","lodge","restaurant","bar","cafe","skiShop","rental","toilet","ticket","parking"];if(buildSelection&&buildingIds.includes(buildSelection.id)){if(!ghost)ghost=createDetailedBuilding(buildSelection.id,p.x,p.z,true);else ghost.setPosition(p.x,height(p.x,p.z),p.z)}else if(draggingBuild&&buildSelection&&(buildSelection.id.toLowerCase().includes("piste")||["chair","gondola","tbar","magic"].includes(buildSelection.id))){if(buildStart&&!ghost){ghost=new pc.Entity("Route preview");app.root.addChild(ghost)}}return}if(!pointers.has(e.pointerId))return;const old=pointers.get(e.pointerId);pointers.set(e.pointerId,[e.clientX,e.clientY]);if(pointers.size===1){yaw-=(e.clientX-old[0])*.22;pitch=Math.max(14,Math.min(72,pitch+(e.clientY-old[1])*.18));updateCamera()}else if(pointers.size===2){const a=[...pointers.values()],d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(lastDist)distance=Math.max(48,Math.min(160,distance-(d-lastDist)*.35));lastDist=d;updateCamera()}});
 canvas.addEventListener("pointerup",e=>{if(buildMode){draggingBuild=false;const p=worldPointFromScreen(e.clientX,e.clientY);if(buildSelection&&["hotel","chalet","lodge","restaurant","bar","cafe","skiShop","rental","toilet","ticket","parking"].includes(buildSelection.id))placeBuilding(p);else if(buildSelection&&(buildSelection.id.toLowerCase().includes("piste")||["chair","gondola","tbar","magic"].includes(buildSelection.id)))beginRoute(buildSelection.id,p);return}pointers.delete(e.pointerId);lastDist=0});
 canvas.addEventListener("wheel",e=>{distance=Math.max(48,Math.min(160,distance+e.deltaY*.06));updateCamera()},{passive:true});
 window.addEventListener("resize",()=>app.resizeCanvas(canvas.clientWidth,canvas.clientHeight));
