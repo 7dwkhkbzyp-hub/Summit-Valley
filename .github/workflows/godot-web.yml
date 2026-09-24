@@ -1,0 +1,52 @@
+name: Build and Deploy Summit Valley Godot
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.4.1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot export templates
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates
+          mkdir -p ~/.config
+          if [ -d /root/.config/godot ]; then mv /root/.config/godot ~/.config/godot; fi
+          if [ -d /root/.local/share/godot/export_templates/4.4.1.stable ]; then mv /root/.local/share/godot/export_templates/4.4.1.stable ~/.local/share/godot/export_templates/4.4.1.stable; fi
+          test -f ~/.local/share/godot/export_templates/4.4.1.stable/web_nothreads_release.zip
+      - name: Validate Godot project
+        working-directory: GodotProject
+        run: godot --headless --editor --quit
+      - name: Export Godot Web build
+        working-directory: GodotProject
+        run: |
+          rm -rf build/web
+          mkdir -p build/web
+          godot --headless --export-release "Web" build/web/index.html
+      - name: Verify export
+        working-directory: GodotProject
+        run: |
+          test -f build/web/index.html
+          test -f build/web/index.pck
+          test -f build/web/index.js
+          test -f build/web/index.wasm
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: GodotProject/build/web
+      - name: Deploy
+        uses: actions/deploy-pages@v4
