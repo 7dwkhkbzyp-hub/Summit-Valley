@@ -92,7 +92,7 @@ paths.forEach(path=>{path.pts.forEach(([x,z],i)=>{const prev=path.pts[Math.max(0
 
 function ribbon(path){const verts=[],inds=[],normals=[];for(let i=0;i<path.pts.length;i++){const[x,z]=path.pts[i],prev=path.pts[Math.max(0,i-1)],next=path.pts[Math.min(path.pts.length-1,i+1)],dx=next[0]-prev[0],dz=next[1]-prev[1],l=Math.hypot(dx,dz)||1,nx=-dz/l,nz=dx/l,w=path.width/2,left=[x+nx*w,z+nz*w],right=[x-nx*w,z-nz*w];verts.push(left[0],height(left[0],left[1])+.18,left[1],right[0],height(right[0],right[1])+.18,right[1]);normals.push(0,1,0,0,1,0)}for(let i=0;i<path.pts.length-1;i++){const q=i*2;inds.push(q,q+1,q+2,q+1,q+3,q+2)}meshEntity(path.name+" groomed piste",verts,inds,path.color,normals);path.pts.forEach(([x,z],i)=>{if(i%2===0){const dx=path.pts[Math.min(path.pts.length-1,i+1)][0]-path.pts[Math.max(0,i-1)][0],dz=path.pts[Math.min(path.pts.length-1,i+1)][1]-path.pts[Math.max(0,i-1)][1],l=Math.hypot(dx,dz)||1,nx=-dz/l,nz=dx/l;for(const s of[-1,1]){const px=x+nx*(path.width*.64)*s,pz=z+nz*(path.width*.64)*s;cyl(path.name+" marker pole",[.045,1.25,.045],[px,height(px,pz)+.62,pz],yellow)}}})}
 paths.forEach(ribbon);
-if(snowFx&&snowFx.particlesystem)snowFx.particlesystem.enabled=weather!==0;
+if(snowFx&&snowFx.particlesystem)snowFx.particlesystem.enabled=false;
 
 function signAt(text,x,z,color){const y=height(x,z)+1.2,e=new pc.Entity(text);e.setLocalPosition(x,y,z);app.root.addChild(e);cyl("sign post",[.06,1.3,.06],[0,-.65,0],steel,e);box("sign board",[1.55,.62,.1],[0,.05,0],color,e)}
 signAt("MEADOW",-18,1,green);signAt("RIDGE",12,1,red);signAt("GLACIER",18,4,blue);signAt("COULOIR",29,4,black);
@@ -544,7 +544,7 @@ function beginRoute(type,p){
  if(type==="piste"){const colour=buildSelection.id==="greenPiste"?green:buildSelection.id==="bluePiste"?blue:buildSelection.id==="redPiste"?red:black;
   const path={name:buildSelection.name+" "+(paths.length+1),color:colour,width:buildSelection.id==="blackPiste"?3.8:5.0,pts:[[a.x,a.z],[(a.x*2+b.x)/3,(a.z*2+b.z)/3],[b.x,b.z]]};
   paths.push(path);ribbon(path);toast(path.name+" built");
- }else if(buildSelection.id==="chair"||buildSelection.id==="gondola"){makeLift("Player "+buildSelection.name,[a.x,a.z],[b.x,b.z],buildSelection.id==="gondola"?8:10,buildSelection.id==="gondola"?"gondola":"chair");toast(buildSelection.name+" constructed")}else{makeSurfaceLift("Player "+buildSelection.name",[a.x,a.z],[b.x,b.z],buildSelection.id);toast(buildSelection.name+" constructed")}
+ }else if(buildSelection.id==="chair"||buildSelection.id==="gondola"){makeLift("Player "+buildSelection.name,[a.x,a.z],[b.x,b.z],buildSelection.id==="gondola"?8:10,buildSelection.id==="gondola"?"gondola":"chair");toast(buildSelection.name+" constructed")}else{makeSurfaceLift("Player "+buildSelection.name,[a.x,a.z],[b.x,b.z],buildSelection.id);toast(buildSelection.name+" constructed")}
  buildStart=null;
 }
 
