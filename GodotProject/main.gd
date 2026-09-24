@@ -1,114 +1,149 @@
 extends Node3D
 
-# Summit Valley — Godot ski-resort tycoon foundation.
-# Original systems and procedural geometry, inspired by the ski-resort-tycoon genre.
+# SUMMIT VALLEY — playable mobile ski-resort tycoon
+# Designed as a lightweight Godot 4 Web/mobile prototype with real gameplay loops.
 
 const MAP_SIZE := 180.0
-const GRID := 70
+const GRID := 56
 const START_CASH := 250000.0
+const MAX_GUESTS := 180
+const PISTE_COLOURS := {
+    "GREEN": Color("#43d17b"),
+    "BLUE": Color("#3f9cff"),
+    "RED": Color("#ef4f4f"),
+    "BLACK": Color("#292b30")
+}
 
 var cash := START_CASH
 var reputation := 62.0
-var guest_count := 85
 var ticket_price := 72.0
-var paused := false
-var snow_depth := 1.0
+var guest_count := 45
+var guest_capacity := 90
 var day := 1
-var time_of_day := 9.0
+var hour := 8.5
+var paused := false
+var weather := "SUNNY"
+var snow_depth := 1.15
+var season := 1
+var season_days := 28
+var game_speed := 1.0
+var income_timer := 0.0
+var weather_timer := 0.0
+var save_key := "summit_valley_tycoon_v2"
 
 var camera: Camera3D
 var sun: DirectionalLight3D
 var terrain_mesh: MeshInstance3D
+var world_env: WorldEnvironment
+
 var piste_root := Node3D.new()
 var lift_root := Node3D.new()
 var building_root := Node3D.new()
 var guest_root := Node3D.new()
+var scenery_root := Node3D.new()
 
-var hud: Label
-var mode_label: Label
-var toast_label: Label
-
-var mode := "SELECT"
-var painting := false
-var paint_points := PackedVector3Array()
 var pistes: Array = []
 var lifts: Array = []
 var buildings: Array = []
 var guests: Array = []
+
 var rng := RandomNumberGenerator.new()
-var lift_clock := 0.0
-var mobile_bar: HBoxContainer
-var mobile_buttons: Array[Button] = []
+var mode := "SELECT"
+var painting := false
+var paint_points := PackedVector3Array()
+var selected_piste := "BLUE"
+var camera_target := Vector3(0, 20, 0)
+var camera_distance := 115.0
+var camera_yaw := 42.0
+var camera_pitch := -47.0
+var touch_start := Vector2.ZERO
+var last_touch := Vector2.ZERO
+var touch_mode := false
+
+var hud: Label
+var info: Label
+var mode_label: Label
+var toast: Label
+var controls: HBoxContainer
 
 func _ready() -> void:
-    rng.seed = 90210
-    piste_root.name = "Pistes"
-    lift_root.name = "Lifts"
-    building_root.name = "Buildings"
-    guest_root.name = "Guests"
+    rng.seed = 73191
+    add_child(scenery_root)
     add_child(piste_root)
     add_child(lift_root)
     add_child(building_root)
     add_child(guest_root)
-    _environment()
-    _terrain()
-    _initial_resort()
-    _spawn_guests(85)
-    _ui()
+    _setup_environment()
+    _build_mountain()
+    _build_initial_resort()
+    _spawn_guests(45)
+    _build_ui()
     _set_mode("SELECT")
+    _load_game()
     get_viewport().size_changed.connect(_layout_ui)
     _layout_ui()
+    _toast("Welcome to Summit Valley — build a resort and keep the mountain busy!")
 
 func _process(delta: float) -> void:
     if paused:
+        _update_hud()
         return
-    time_of_day += delta * 0.045
-    if time_of_day >= 24.0:
-        time_of_day -= 24.0
+    var dt := delta * game_speed
+    hour += dt * 0.055
+    if hour >= 24.0:
+        hour -= 24.0
         day += 1
-    snow_depth = clamp(snow_depth + sin(Time.get_ticks_msec() * 0.00007) * 0.00002, 0.45, 2.2)
-    cash += (guest_count * ticket_price * 0.00012 + buildings.size() * 0.25) * delta
-    reputation = clamp(reputation + (snow_depth - 0.8) * 0.00015 * delta, 0.0, 100.0)
-    _animate_guests(delta)
-    _animate_lifts(delta)
+        if day > season_days:
+            day = 1
+            season += 1
+    income_timer += dt
+    weather_timer += dt
+    if income_timer >= 1.0:
+        income_timer = 0.0
+        _economy_tick()
+    if weather_timer >= 18.0:
+        weather_timer = 0.0
+        _weather_tick()
+    _animate_guests(dt)
+    _animate_lifts(dt)
     _update_sun()
     _update_hud()
 
 func terrain_height(x: float, z: float) -> float:
-    var a = 42.0 * exp(-((x + 38.0) ** 2 / 1900.0 + (z - 15.0) ** 2 / 2600.0))
-    var b = 58.0 * exp(-((x - 30.0) ** 2 / 2100.0 + (z + 22.0) ** 2 / 3300.0))
-    var c = 35.0 * exp(-((x + 4.0) ** 2 / 900.0 + (z + 48.0) ** 2 / 1500.0))
-    var valley = -18.0 * exp(-(x ** 2 / 1100.0 + (z - 18.0) ** 2 / 1700.0))
-    return max(0.0, 6.0 + a + b + c + valley + 7.0 * sin(x * 0.055) * cos(z * 0.045))
+    var peak_a = 43.0 * exp(-((x + 38.0) ** 2 / 1800.0 + (z - 18.0) ** 2 / 2600.0))
+    var peak_b = 55.0 * exp(-((x - 30.0) ** 2 / 1900.0 + (z + 22.0) ** 2 / 3200.0))
+    var peak_c = 32.0 * exp(-((x + 3.0) ** 2 / 1000.0 + (z + 52.0) ** 2 / 1500.0))
+    var valley = -18.0 * exp(-(x ** 2 / 1500.0 + (z - 15.0) ** 2 / 1900.0))
+    var ridges = 5.5 * sin(x * 0.055) * cos(z * 0.045)
+    return max(1.5, 7.0 + peak_a + peak_b + peak_c + valley + ridges)
 
-func _environment() -> void:
-    var world := WorldEnvironment.new()
+func _setup_environment() -> void:
+    world_env = WorldEnvironment.new()
     var env := Environment.new()
     env.background_mode = Environment.BG_COLOR
-    env.background_color = Color("#9fc5e8")
+    env.background_color = Color("#91bde0")
     env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-    env.ambient_light_color = Color("#c7dcf0")
-    env.ambient_light_energy = 0.75
+    env.ambient_light_color = Color("#d9e8f4")
+    env.ambient_light_energy = 0.82
     env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-    world.environment = env
-    add_child(world)
+    world_env.environment = env
+    add_child(world_env)
 
     sun = DirectionalLight3D.new()
-    sun.light_energy = 1.6
+    sun.light_energy = 1.55
     sun.shadow_enabled = true
-    sun.directional_shadow_max_distance = 260.0
+    sun.directional_shadow_max_distance = 220.0
     add_child(sun)
 
     camera = Camera3D.new()
-    camera.position = Vector3(92, 82, 112)
-    camera.look_at(Vector3(0, 24, 0), Vector3.UP)
-    camera.fov = 52.0
+    camera.fov = 55.0
     add_child(camera)
+    _update_camera()
 
-func _terrain() -> void:
+func _build_mountain() -> void:
     var st := SurfaceTool.new()
     st.begin(Mesh.PRIMITIVE_TRIANGLES)
-    st.set_material(_mat(Color("#e8eef2"), 0.92))
+    st.set_material(_mat(Color("#eaf1f5"), 0.94))
     for z in range(GRID - 1):
         for x in range(GRID - 1):
             var x0 = -MAP_SIZE * 0.5 + x * MAP_SIZE / float(GRID - 1)
@@ -123,484 +158,575 @@ func _terrain() -> void:
             st.add_vertex(p10); st.add_vertex(p11); st.add_vertex(p01)
     st.generate_normals()
     terrain_mesh = MeshInstance3D.new()
+    terrain_mesh.name = "SnowMountain"
     terrain_mesh.mesh = st.commit()
-    terrain_mesh.name = "AlpineMountain"
     add_child(terrain_mesh)
 
-    for i in 260:
-        var x = rng.randf_range(-88.0,88.0)
-        var z = rng.randf_range(-88.0,88.0)
-        var y = terrain_height(x,z)
-        if y < 12.0 or y > 54.0:
+    # Efficient scenery: shared meshes, not hundreds of independent trees.
+    var tree_mesh := _pine_mesh()
+    for i in range(115):
+        var x := rng.randf_range(-82.0,82.0)
+        var z := rng.randf_range(-82.0,82.0)
+        var y := terrain_height(x,z)
+        if y < 11.0 or y > 48.0:
             continue
-        _tree(Vector3(x,y,z))
+        var tree := MeshInstance3D.new()
+        tree.mesh = tree_mesh
+        tree.material_override = _mat(Color("#173f34"),0.9)
+        tree.position = Vector3(x,y,z)
+        var s := rng.randf_range(0.75,1.35)
+        tree.scale = Vector3(s,s,s)
+        scenery_root.add_child(tree)
 
-    for p in [Vector3(-38,42,15),Vector3(30,57,-22),Vector3(0,38,-48)]:
-        var cap = _cone(12.0,8.0,Color("#fbfdff"))
-        cap.position = p
-        add_child(cap)
+    for p in [Vector3(-38,49,18),Vector3(30,61,-22),Vector3(0,40,-52)]:
+        var cap := _cone(11.0,7.0,Color("#ffffff"))
+        cap.position=p
+        scenery_root.add_child(cap)
 
-func _tree(pos: Vector3) -> void:
-    var n := Node3D.new()
-    n.position = pos
-    var trunk = _box(Vector3(0.7,3.0,0.7),Color("#4b3225"))
-    trunk.position.y = 1.5
-    n.add_child(trunk)
-    for j in 3:
-        var crown = _cone(3.0 - j * 0.5,4.6,Color("#174436"))
-        crown.position.y = 3.0 + j * 2.0
-        n.add_child(crown)
-    add_child(n)
+func _build_initial_resort() -> void:
+    _building("ALPINE GRAND HOTEL",Vector3(-8,terrain_height(-8,24),24),65000.0)
+    _building("MOUNTAIN RESTAURANT",Vector3(20,terrain_height(20,-5),-5),32000.0)
+    _building("RENTAL CENTRE",Vector3(-25,terrain_height(-25,40),40),22000.0)
+    _building("SKI SCHOOL",Vector3(8,terrain_height(8,27),27),18000.0)
 
-func _initial_resort() -> void:
-    _building("Alpine Grand Hotel",Vector3(-8,terrain_height(-8,24),24),65000.0)
-    _building("Mountain Restaurant",Vector3(22,terrain_height(22,-4),-4),32000.0)
-    _building("Rental Centre",Vector3(-24,terrain_height(-24,42),42),22000.0)
+    _piste([Vector3(-20,terrain_height(-20,-42)+0.4,-42),Vector3(-16,38,-30),Vector3(-7,31,-16),Vector3(1,24,-2),Vector3(-4,terrain_height(-4,14)+0.4,14),Vector3(-8,terrain_height(-8,24)+0.4,24)],"GREEN")
+    _piste([Vector3(-28,terrain_height(-28,-48)+0.4,-48),Vector3(-28,43,-31),Vector3(-20,35,-18),Vector3(-5,27,-3),Vector3(8,22,10),Vector3(1,terrain_height(1,16)+0.4,18)],"BLUE")
+    _piste([Vector3(31,terrain_height(31,-43)+0.4,-43),Vector3(35,49,-30),Vector3(27,40,-19),Vector3(20,32,-8),Vector3(12,25,3),Vector3(20,terrain_height(20,-5)+0.4,-5)],"RED")
+    _piste([Vector3(40,terrain_height(40,-46)+0.4,-46),Vector3(45,55,-28),Vector3(38,46,-12),Vector3(31,38,2),Vector3(25,31,10),Vector3(20,terrain_height(20,-5)+0.4,-5)],"BLACK")
 
-    # A small network of distinct pistes. Guests can choose different routes and lanes.
-    _piste([Vector3(-20,terrain_height(-20,-40)+0.35,-40),Vector3(-16,35,-30),Vector3(-8,30,-17),Vector3(1,24,-5),Vector3(-2,terrain_height(-2,12)+0.35,12),Vector3(-8,terrain_height(-8,24)+0.35,24)],"GREEN")
-    _piste([Vector3(-27,terrain_height(-27,-46)+0.35,-46),Vector3(-29,43,-30),Vector3(-20,34,-18),Vector3(-5,25,-2),Vector3(7,21,11),Vector3(0,terrain_height(0,14)+0.35,18)],"BLUE")
-    _piste([Vector3(30,terrain_height(30,-42)+0.35,-42),Vector3(35,49,-30),Vector3(27,40,-20),Vector3(20,32,-8),Vector3(12,25,3),Vector3(22,terrain_height(22,-4)+0.35,-4)],"RED")
-    _piste([Vector3(39,terrain_height(39,-45)+0.35,-45),Vector3(44,55,-28),Vector3(37,46,-13),Vector3(31,38,1),Vector3(25,31,10),Vector3(22,terrain_height(22,-4)+0.35,-4)],"BLACK")
-
-    _lift(Vector3(-8,terrain_height(-8,24)+3,24),Vector3(-20,terrain_height(-20,-40)+3,-40),"HIGH-SPEED QUAD")
-    _lift(Vector3(22,terrain_height(22,-4)+3,-4),Vector3(30,terrain_height(30,-42)+3,-42),"GONDOLA")
-    _lift(Vector3(0,terrain_height(0,14)+2,18),Vector3(27,terrain_height(27,-20)+2,-20),"DETACHABLE SIX")
-
+    _lift(Vector3(-8,terrain_height(-8,24)+2.5,24),Vector3(-20,terrain_height(-20,-42)+2.5,-42),"HIGH-SPEED QUAD")
+    _lift(Vector3(20,terrain_height(20,-5)+2.5,-5),Vector3(31,terrain_height(31,-43)+2.5,-43),"GONDOLA")
+    _lift(Vector3(1,terrain_height(1,16)+2.5,18),Vector3(27,terrain_height(27,-20)+2.5,-20),"DETACHABLE SIX")
 
 func _piste(points: Array, difficulty: String) -> void:
-    var d = {"points":PackedVector3Array(points),"difficulty":difficulty,"condition":100.0}
+    var d = {"points":PackedVector3Array(points),"difficulty":difficulty,"condition":100.0,"open":true,"name":difficulty+" RUN "+str(pistes.size()+1)}
     pistes.append(d)
     _render_piste(d)
 
 func _render_piste(d: Dictionary) -> void:
     var pts: PackedVector3Array = d["points"]
-    if pts.size() < 2:
-        return
+    if pts.size() < 2: return
+    var col: Color = PISTE_COLOURS[d["difficulty"]]
     var st := SurfaceTool.new()
     st.begin(Mesh.PRIMITIVE_TRIANGLES)
-    var col = {"GREEN":Color("#55d27c"),"BLUE":Color("#4fa7ff"),"RED":Color("#ef5555"),"BLACK":Color("#25252a")}.get(d["difficulty"],Color.WHITE)
-    st.set_material(_mat(col,0.26))
+    st.set_material(_mat(col,0.24))
     for i in range(pts.size()-1):
         var a=pts[i]; var b=pts[i+1]
         var side=(b-a).cross(Vector3.UP).normalized()
-        var w=4.8 if d["difficulty"] != "BLACK" else 4.1
+        var w=4.9 if d["difficulty"] != "BLACK" else 4.2
         st.add_vertex(a+side*w); st.add_vertex(b+side*w); st.add_vertex(a-side*w)
         st.add_vertex(a-side*w); st.add_vertex(b+side*w); st.add_vertex(b-side*w)
     var mi:=MeshInstance3D.new()
     mi.mesh=st.commit()
     piste_root.add_child(mi)
 
-    # Proper piste-side markers: repeated poles with coloured rectangular flags.
-    var marker_col = col
-    var step := 5.5
-    var distance := 0.0
     for i in range(pts.size()-1):
         var a=pts[i]; var b=pts[i+1]
-        var length=a.distance_to(b)
-        var count=max(1,int(length/step))
+        var count=max(1,int(a.distance_to(b)/6.0))
+        var side=(b-a).cross(Vector3.UP).normalized()
         for j in range(count):
             var t=(float(j)+0.5)/float(count)
-            var p=a.lerp(b,t)
-            var tangent=(b-a).normalized()
-            var side=tangent.cross(Vector3.UP).normalized()
-            _piste_marker(p + side*5.8, marker_col, side)
-            _piste_marker(p - side*5.8, marker_col, -side)
-        distance += length
+            _piste_marker(a.lerp(b,t)+side*5.7,col)
+            _piste_marker(a.lerp(b,t)-side*5.7,col)
 
-    var sign := Label3D.new()
-    sign.text = d["difficulty"] + " PISTE"
-    sign.font_size = 28
-    sign.outline_size = 7
-    sign.modulate = marker_col
-    sign.position = pts[0] + Vector3.UP*2.8
+    var sign:=Label3D.new()
+    sign.text=d["name"]
+    sign.font_size=24
+    sign.outline_size=7
+    sign.modulate=col
+    sign.position=pts[0]+Vector3.UP*3
     piste_root.add_child(sign)
 
-func _piste_marker(pos: Vector3, col: Color, outward: Vector3) -> void:
-    var pole := _cylinder(0.09,2.5,Color("#eef4f6"))
-    pole.position = pos + Vector3.UP*1.25
+func _piste_marker(pos:Vector3,col:Color)->void:
+    var pole:=_cylinder(0.07,2.5,Color("#f1f4f6"))
+    pole.position=pos+Vector3.UP*1.25
     piste_root.add_child(pole)
-    var flag := _box(Vector3(0.62,0.46,0.10),col)
-    flag.position = pos + Vector3.UP*2.15 + outward*0.08
-    flag.look_at(flag.position + outward, Vector3.UP)
+    var flag:=_box(Vector3(0.7,0.48,0.12),col)
+    flag.position=pos+Vector3.UP*2.1
     piste_root.add_child(flag)
 
-func _lift(a: Vector3,b: Vector3,type_name: String) -> void:
-    var data={"a":a,"b":b,"type":type_name,"open":true,"carriers":[],"phase":rng.randf_range(0.0,10.0)}
+func _lift(a:Vector3,b:Vector3,type_name:String)->void:
+    var data={"a":a,"b":b,"type":type_name,"carriers":[],"phase":rng.randf()}
     lifts.append(data)
-
-    # Two parallel cable runs with visible sag between substantial lift towers.
-    var cable_col=Color("#25292d")
-    var towers:=10
-    for i in range(towers):
-        var t=float(i)/float(towers-1)
+    var tower_count:=10
+    for i in range(tower_count):
+        var t=float(i)/float(tower_count-1)
         var p=a.lerp(b,t)
-        var tower_h=9.0
-        var tower=_box(Vector3(0.75,tower_h,0.75),Color("#68737a"))
-        tower.position=p+Vector3.UP*(tower_h*0.5)
+        var h:=9.0
+        var tower:=_box(Vector3(0.72,h,0.72),Color("#68747b"))
+        tower.position=p+Vector3.UP*h*0.5
         lift_root.add_child(tower)
-        var cross=_box(Vector3(5.2,0.32,0.42),Color("#525b61"))
-        cross.position=p+Vector3.UP*tower_h
+        var cross:=_box(Vector3(5.4,0.28,0.45),Color("#4d565d"))
+        cross.position=p+Vector3.UP*h
         lift_root.add_child(cross)
-        for sx in [-1.0,1.0]:
-            var sheave=_cylinder(0.38,0.22,Color("#1f2327"))
-            sheave.position=p+Vector3(sx*2.0,tower_h-0.25,0)
+        for sx in [-2.0,2.0]:
+            var sheave:=_cylinder(0.36,0.18,Color("#1f2327"))
+            sheave.position=p+Vector3(sx,h-0.3,0)
             sheave.rotation_degrees.x=90
             lift_root.add_child(sheave)
 
     for run in [-1.0,1.0]:
-        var segments:=18
-        for i in range(segments):
-            var t0=float(i)/segments
-            var t1=float(i+1)/segments
-            var p0=a.lerp(b,t0)+Vector3(run*2.0,9.0,0)+Vector3.UP*(-sin(t0*PI)*3.0)
-            var p1=a.lerp(b,t1)+Vector3(run*2.0,9.0,0)+Vector3.UP*(-sin(t1*PI)*3.0)
-            lift_root.add_child(_beam(p0,p1,0.10,cable_col))
+        for i in range(18):
+            var t0=float(i)/18.0
+            var t1=float(i+1)/18.0
+            var p0=a.lerp(b,t0)+Vector3(run*2.0,9.0-sin(t0*PI)*2.8,0)
+            var p1=a.lerp(b,t1)+Vector3(run*2.0,9.0-sin(t1*PI)*2.8,0)
+            lift_root.add_child(_beam(p0,p1,0.09,Color("#20252a")))
 
-    # Detailed stations with roofs, loading platforms and bullwheels.
     _lift_station(a,"BOTTOM",type_name)
     _lift_station(b,"TOP",type_name)
 
-    var carrier_count=18 if type_name.find("GONDOLA") < 0 else 12
-    for i in range(carrier_count):
+    var count:=14 if type_name.find("GONDOLA")<0 else 10
+    for i in range(count):
         var carrier:=Node3D.new()
-        carrier.name="Carrier"
-        var t=float(i)/float(carrier_count)
-        carrier.position=a.lerp(b,t)+Vector3.UP*(8.7-sin(t*PI)*3.0)
-        var hanger=_beam(Vector3.ZERO,Vector3.UP*-2.0,0.08,Color("#303438"))
-        carrier.add_child(hanger)
-        if type_name.find("GONDOLA") >= 0:
-            var cabin=_box(Vector3(2.8,1.9,2.2),Color("#dfe7ea"))
-            cabin.position.y=-3.0
+        var t=float(i)/float(count)
+        carrier.position=a.lerp(b,t)+Vector3.UP*(8.7-sin(t*PI)*2.8)
+        carrier.set_meta("lift_t",t)
+        carrier.set_meta("lift_speed",0.012 if type_name.find("GONDOLA")<0 else 0.009)
+        if type_name.find("GONDOLA")>=0:
+            var cabin:=_box(Vector3(2.8,1.9,2.15),Color("#e3e8ea"))
+            cabin.position.y=-2.8
             carrier.add_child(cabin)
-            var glass=_box(Vector3(2.45,1.1,0.12),Color("#8fc6e6"))
-            glass.position=Vector3(0,-2.8,-1.12)
+            var glass:=_box(Vector3(2.45,1.05,0.12),Color("#72b9d7"))
+            glass.position=Vector3(0,-2.8,-1.1)
             carrier.add_child(glass)
         else:
-            var seat=_box(Vector3(2.5,0.20,1.0),Color("#b42d2d"))
-            seat.position.y=-2.2
+            var seat:=_box(Vector3(2.6,0.22,1.0),Color("#b72e34"))
+            seat.position.y=-2.15
             carrier.add_child(seat)
-            var back=_box(Vector3(2.5,1.0,0.18),Color("#8e2525"))
-            back.position=Vector3(0,-1.7,0.38)
+            var back:=_box(Vector3(2.6,1.0,0.18),Color("#8f252b"))
+            back.position=Vector3(0,-1.65,0.35)
             carrier.add_child(back)
-            for x in [-0.9,0.9]:
-                carrier.add_child(_beam(Vector3(x,-2.1,0),Vector3(x,-0.9,0),0.055,Color("#303438")))
+            carrier.add_child(_beam(Vector3(0,-0.1,0),Vector3(0,-2.0,0),0.07,Color("#303438")))
         lift_root.add_child(carrier)
         data["carriers"].append(carrier)
 
-func _lift_station(pos: Vector3, side: String, type_name: String) -> void:
+func _lift_station(pos:Vector3,side:String,type_name:String)->void:
     var root:=Node3D.new()
     root.position=pos
-    var platform=_box(Vector3(12,0.8,7),Color("#667178"))
+    var platform:=_box(Vector3(12,0.8,7),Color("#626e75"))
     platform.position.y=0.5
     root.add_child(platform)
-    var roof=_box(Vector3(13,0.7,8),Color("#354048"))
-    roof.position.y=8.5
+    var roof:=_box(Vector3(13,0.7,8),Color("#313b42"))
+    roof.position.y=8.4
     root.add_child(roof)
-    var glass=_box(Vector3(10,4.5,5.8),Color("#9ccfe5"))
-    glass.position.y=4.3
+    var glass:=_box(Vector3(10,4.5,5.8),Color("#8dc9df"))
+    glass.position.y=4.2
     root.add_child(glass)
-    for x in [-5.0,5.0]:
-        root.add_child(_beam(Vector3(x,1,0),Vector3(x,8,0),0.18,Color("#30373d")))
-    var wheel=_cylinder(2.0,0.5,Color("#252a2e"))
-    wheel.position=Vector3(0,7.0,0)
+    var wheel:=_cylinder(2.0,0.45,Color("#20252a"))
+    wheel.position=Vector3(0,6.8,0)
     wheel.rotation_degrees.x=90
     root.add_child(wheel)
     var label:=Label3D.new()
-    label.text=type_name + " " + side
-    label.font_size=22
+    label.text=type_name+" "+side
+    label.font_size=20
     label.outline_size=6
-    label.position.y=10.0
+    label.position.y=10
     root.add_child(label)
     lift_root.add_child(root)
 
-func _building(title: String,pos: Vector3,cost: float) -> void:
-    buildings.append({"name":title,"pos":pos,"cost":cost})
-    var root:=Node3D.new()
-    root.position=pos
-    var base=_box(Vector3(12,7,9),Color("#956745"))
-    base.position.y=3.5
-    root.add_child(base)
-    var roof=_box(Vector3(13,1.2,10),Color("#3b2c27"))
-    roof.position.y=8.0
-    root.add_child(roof)
-    for x in [-3.8,-1.3,1.3,3.8]:
-        var win=_box(Vector3(1.5,1.5,0.18),Color("#ffd77a"))
-        win.position=Vector3(x,4.1,-4.6)
-        root.add_child(win)
-    var label:=Label3D.new()
-    label.text=title
-    label.font_size=34
-    label.outline_size=8
-    label.position.y=10.0
-    root.add_child(label)
-    building_root.add_child(root)
-
-func _spawn_guests(count: int) -> void:
+func _spawn_guests(count:int)->void:
     for i in range(count):
-        var n=_skier(i)
-        var route=rng.randi_range(0,max(0,pistes.size()-1))
-        guests.append({"node":n,"route":route,"t":rng.randf(),"speed":rng.randf_range(0.018,0.036),"lane":rng.randf_range(-2.7,2.7),"phase":rng.randf_range(0.0,TAU)})
-        guest_root.add_child(n)
+        _spawn_guest(i)
 
-func _skier(i: int) -> Node3D:
+func _spawn_guest(i:int)->void:
+    if pistes.is_empty(): return
+    var n:=_skier(i)
+    var route:=rng.randi_range(0,pistes.size()-1)
+    var g={"node":n,"route":route,"t":rng.randf(),"speed":rng.randf_range(0.015,0.032),"lane":rng.randf_range(-2.8,2.8),"phase":rng.randf_range(0.0,TAU)}
+    guests.append(g)
+    guest_root.add_child(n)
+
+func _skier(i:int)->Node3D:
     var n:=Node3D.new()
-    n.name="Skier_%02d" % i
-    var jacket_colors=[Color("#d94b45"),Color("#3178c6"),Color("#e3a52f"),Color("#7b4db4"),Color("#28a878"),Color("#f07b38")]
-    var jacket=jacket_colors[i % jacket_colors.size()]
-    var body=_box(Vector3(0.62,1.20,0.48),jacket)
+    n.name="Skier_"+str(i)
+    var jackets=[Color("#d84b42"),Color("#397bc5"),Color("#e2a52f"),Color("#744db1"),Color("#24a578"),Color("#ed7834")]
+    var jacket=jackets[i%jackets.size()]
+    var body:=_box(Vector3(0.62,1.2,0.48),jacket)
     body.name="Body"
-    body.position.y=1.15
+    body.position.y=1.12
     n.add_child(body)
-    var head=_sphere(0.39,Color("#efc4a2"))
-    head.position.y=2.05
+    var head:=_sphere(0.39,Color("#efc5a5"))
+    head.position.y=2.02
     n.add_child(head)
-    var helmet=_sphere(0.44,Color("#1e252b"))
+    var helmet:=_sphere(0.44,Color("#20262b"))
     helmet.scale=Vector3(1,0.64,1)
-    helmet.position.y=2.30
+    helmet.position.y=2.28
     n.add_child(helmet)
-    var goggles=_box(Vector3(0.42,0.13,0.10),Color("#71c9df"))
-    goggles.position=Vector3(0,2.08,-0.34)
+    var goggles:=_box(Vector3(0.43,0.13,0.10),Color("#73c8dc"))
+    goggles.position=Vector3(0,2.07,-0.34)
     n.add_child(goggles)
-
-    var pants=_box(Vector3(0.68,0.72,0.50),Color("#252b33"))
+    var pants:=_box(Vector3(0.68,0.72,0.5),Color("#252b33"))
     pants.position.y=0.42
     n.add_child(pants)
-
-    for side in [-1.0,1.0]:
-        var ski=_box(Vector3(0.10,0.07,2.15),Color("#f1f4f5"))
-        ski.position=Vector3(side*0.22,0.10,0)
+    for s in [-1.0,1.0]:
+        var ski:=_box(Vector3(0.10,0.07,2.15),Color("#f4f6f7"))
+        ski.position=Vector3(s*0.22,0.10,0)
         n.add_child(ski)
-        var boot=_box(Vector3(0.20,0.22,0.45),Color("#15191d"))
-        boot.position=Vector3(side*0.22,0.22,-0.18)
+        var boot:=_box(Vector3(0.20,0.22,0.45),Color("#15191d"))
+        boot.position=Vector3(s*0.22,0.22,-0.18)
         n.add_child(boot)
-        var pole=_beam(Vector3(side*0.38,1.05,-0.05),Vector3(side*0.48,0.05,-0.65),0.025,Color("#343a40"))
-        n.add_child(pole)
-
-    var arm_l=_beam(Vector3(-0.32,1.55,0),Vector3(-0.58,1.0,-0.15),0.10,jacket)
-    var arm_r=_beam(Vector3(0.32,1.55,0),Vector3(0.58,1.0,-0.15),0.10,jacket)
-    arm_l.name="ArmL"; arm_r.name="ArmR"
-    n.add_child(arm_l); n.add_child(arm_r)
+        n.add_child(_beam(Vector3(s*0.38,1.05,-0.05),Vector3(s*0.50,0.05,-0.65),0.025,Color("#30363b")))
+    n.add_child(_beam(Vector3(-0.32,1.55,0),Vector3(-0.58,1.0,-0.15),0.09,jacket))
+    n.add_child(_beam(Vector3(0.32,1.55,0),Vector3(0.58,1.0,-0.15),0.09,jacket))
     return n
 
-func _animate_guests(delta: float) -> void:
-    if pistes.is_empty():
-        return
+func _animate_guests(dt:float)->void:
+    if pistes.is_empty(): return
     for g in guests:
-        g["t"]=fmod(g["t"]+g["speed"]*delta,1.0)
+        g["t"]=fmod(g["t"]+g["speed"]*dt,1.0)
         var pts:PackedVector3Array=pistes[g["route"]]["points"]
-        var segments=max(1,pts.size()-1)
-        var f=g["t"]*segments
-        var idx=min(int(f),segments-1)
+        var seg=max(1,pts.size()-1)
+        var f=g["t"]*seg
+        var idx=min(int(f),seg-1)
         var lt=f-idx
         var p=pts[idx].lerp(pts[idx+1],lt)
         var tangent=(pts[idx+1]-pts[idx]).normalized()
         var side=tangent.cross(Vector3.UP).normalized()
-        var weave=sin(g["t"]*TAU*2.0+g["phase"])*0.65
-        p += side*(g["lane"]+weave)
-        p.y += 0.25
+        p+=side*(g["lane"]+sin(g["t"]*TAU*2.0+g["phase"])*0.65)
+        p.y+=0.25
         g["node"].position=p
         g["node"].rotation.y=atan2(tangent.x,tangent.z)
-        var lean=clamp(g["lane"]*0.12+sin(g["t"]*TAU*3.0+g["phase"])*0.08,-0.35,0.35)
-        g["node"].rotation.z=lean
-        var body=g["node"].get_node_or_null("Body")
-        if body:
-            body.rotation.z=sin(Time.get_ticks_msec()*0.006+g["phase"])*0.05
-        var al=g["node"].get_node_or_null("ArmL")
-        var ar=g["node"].get_node_or_null("ArmR")
-        if al: al.rotation.z=sin(Time.get_ticks_msec()*0.008+g["phase"])*0.10
-        if ar: ar.rotation.z=-sin(Time.get_ticks_msec()*0.008+g["phase"])*0.10
+        g["node"].rotation.z=sin(g["t"]*TAU*3.0+g["phase"])*0.12
 
-func _animate_lifts(delta: float) -> void:
-    lift_clock += delta
+func _animate_lifts(dt:float)->void:
     for data in lifts:
-        var carriers:Array=data["carriers"]
-        for i in range(carriers.size()):
-            var carrier:Node3D=carriers[i]
-            var t=fmod(float(i)/float(max(1,carriers.size())) + lift_clock*0.018 + data["phase"]*0.001,1.0)
-            var a:Vector3=data["a"]
-            var b:Vector3=data["b"]
-            carrier.position=a.lerp(b,t)+Vector3.UP*(8.7-sin(t*PI)*3.0)
-            carrier.rotation.y=atan2((b-a).x,(b-a).z)
+        for carrier in data["carriers"]:
+            var t=float(carrier.get_meta("lift_t"))
+            t=fmod(t+float(carrier.get_meta("lift_speed"))*dt,1.0)
+            carrier.set_meta("lift_t",t)
+            carrier.position=data["a"].lerp(data["b"],t)+Vector3.UP*(8.7-sin(t*PI)*2.8)
 
-func _ui() -> void:
+func _economy_tick()->void:
+    var open_pistes:=0
+    var condition:=0.0
+    for p in pistes:
+        if p["open"]:
+            open_pistes+=1
+            condition+=float(p["condition"])
+            p["condition"]=clamp(float(p["condition"])-0.018+snow_depth*0.004,35.0,100.0)
+    var avg=condition/max(1,open_pistes)
+    var weather_factor=1.0 if weather=="SUNNY" else (0.86 if weather=="CLOUDY" else (0.72 if weather=="SNOW" else 0.55))
+    var target=int(clamp(guest_capacity*(0.55+reputation/200.0)*weather_factor*(0.55+avg/200.0),10,MAX_GUESTS))
+    if guest_count<target and guests.size()<MAX_GUESTS:
+        var add=min(3,target-guest_count)
+        for i in range(add):
+            _spawn_guest(guests.size())
+        guest_count+=add
+    elif guest_count>target+8 and guests.size()>20:
+        var remove=min(2,guest_count-target)
+        for i in range(remove):
+            var g=guests.pop_back()
+            if is_instance_valid(g["node"]): g["node"].queue_free()
+        guest_count-=remove
+
+    var ticket_income=guest_count*ticket_price*0.018
+    var spending=guest_count*(1.7+buildings.size()*0.12)
+    var wages=8.0+buildings.size()*1.7+lifts.size()*4.0
+    cash+=ticket_income+spending-wages
+    reputation=clamp(reputation+(avg-75.0)*0.001+(open_pistes*0.012)-0.004,0.0,100.0)
+    snow_depth=clamp(snow_depth + (0.006 if weather=="SNOW" else -0.0015),0.35,2.5)
+
+func _weather_tick()->void:
+    var roll=rng.randf()
+    if snow_depth<0.7 and roll<0.5:
+        weather="SNOW"
+    elif roll<0.25:
+        weather="CLOUDY"
+    elif roll<0.86:
+        weather="SUNNY"
+    else:
+        weather="SNOW"
+    if weather=="SNOW":
+        _toast("Fresh snowfall! Pistes are getting faster and the mountain is busy.")
+    elif weather=="SUNNY":
+        _toast("Bluebird day — guest demand is rising.")
+
+func _build_ui()->void:
     var layer:=CanvasLayer.new()
     layer.name="HUD"
     add_child(layer)
-    var panel:=ColorRect.new()
-    panel.color=Color(0.03,0.05,0.07,0.84)
-    panel.position=Vector2(18,18)
-    panel.size=Vector2(330,150)
-    layer.add_child(panel)
+
+    var top:=ColorRect.new()
+    top.color=Color(0.025,0.045,0.065,0.88)
+    top.position=Vector2(12,12)
+    top.size=Vector2(430,145)
+    layer.add_child(top)
+
     hud=Label.new()
-    hud.position=Vector2(34,30)
-    hud.add_theme_font_size_override("font_size",20)
+    hud.position=Vector2(28,22)
+    hud.add_theme_font_size_override("font_size",19)
     layer.add_child(hud)
 
+    info=Label.new()
+    info.position=Vector2(28,170)
+    info.add_theme_font_size_override("font_size",16)
+    layer.add_child(info)
+
     mode_label=Label.new()
-    mode_label.position=Vector2(20,670)
-    mode_label.add_theme_font_size_override("font_size",22)
+    mode_label.position=Vector2(18,0)
+    mode_label.add_theme_font_size_override("font_size",19)
     layer.add_child(mode_label)
 
-    toast_label=Label.new()
-    toast_label.position=Vector2(410,28)
-    toast_label.add_theme_font_size_override("font_size",21)
-    layer.add_child(toast_label)
+    toast=Label.new()
+    toast.position=Vector2(460,24)
+    toast.add_theme_font_size_override("font_size",18)
+    layer.add_child(toast)
 
-    var help:=Label.new()
-    help.text="B Build   P Paint Piste   L Lift   SPACE Pause\nMouse click/drag = construct resort"
-    help.position=Vector2(20,585)
-    help.add_theme_font_size_override("font_size",16)
-    layer.add_child(help)
+    controls=HBoxContainer.new()
+    controls.add_theme_constant_override("separation",7)
+    layer.add_child(controls)
+    var actions=[["VIEW","SELECT"],["BUILD","BUILD"],["PISTE","PISTE"],["LIFT","LIFT"],["UPGRADE","UPGRADE"],["SAVE","SAVE"],["PAUSE","PAUSE"]]
+    for a in actions:
+        var b:=Button.new()
+        b.text=a[0]
+        b.custom_minimum_size=Vector2(104,54)
+        b.add_theme_font_size_override("font_size",16)
+        b.pressed.connect(_button_action.bind(a[1]))
+        controls.add_child(b)
 
-    mobile_bar = HBoxContainer.new()
-    mobile_bar.name = "MobileControls"
-    mobile_bar.add_theme_constant_override("separation", 10)
-    layer.add_child(mobile_bar)
-    for item in [["SELECT","SELECT"],["BUILD","BUILD"],["PISTE","PISTE"],["LIFT","LIFT"],["PAUSE","PAUSE"]]:
-        var b := Button.new()
-        b.text = item[0]
-        b.custom_minimum_size = Vector2(118,58)
-        b.add_theme_font_size_override("font_size",18)
-        b.pressed.connect(_mobile_action.bind(item[1]))
-        mobile_bar.add_child(b)
-        mobile_buttons.append(b)
+func _button_action(action:String)->void:
+    if action=="PAUSE":
+        paused=!paused
+    elif action=="SAVE":
+        _save_game()
+    elif action=="UPGRADE":
+        _upgrade_resort()
+    else:
+        _set_mode(action)
 
-func _mobile_action(action: String) -> void:
-    if action == "PAUSE":
-        paused = !paused
+func _upgrade_resort()->void:
+    var cost=30000.0+buildings.size()*7000.0
+    if cash<cost:
+        _toast("Need $%0.0f for the next resort upgrade." % cost)
         return
-    _set_mode(action)
+    cash-=cost
+    guest_capacity=min(MAX_GUESTS,guest_capacity+25)
+    reputation=min(100.0,reputation+3.0)
+    _toast("Resort upgraded! Capacity +25 and reputation +3.")
 
-func _layout_ui() -> void:
-    if not mobile_bar or not hud:
-        return
-    var size := get_viewport().get_visible_rect().size
-    var compact := size.x < 900.0 or size.y < 700.0
-    mobile_bar.position = Vector2(max(12.0,(size.x-mobile_bar.size.x)*0.5), max(12.0,size.y-78.0))
-    mobile_bar.visible = compact
-    mode_label.position = Vector2(20, max(160.0,size.y-125.0))
-    var help = get_node_or_null("CanvasLayer/KeyboardHelp")
-    if help:
-        help.visible = not compact
-
-func _update_hud() -> void:
-    if hud:
-        var mins=int(fmod(time_of_day*60.0,60.0))
-        hud.text="SUMMIT VALLEY\n$%0.0f   Guests %d   Rep %d\nDay %d   Snow %0.2fm   %02d:%02d" % [cash,guest_count,int(reputation),day,snow_depth,int(time_of_day),mins]
-
-func _set_mode(m: String) -> void:
+func _set_mode(m:String)->void:
     mode=m
-    if mode_label:
-        mode_label.text="MODE: "+m+"   |   "+("Drag to paint a piste" if m=="PISTE" else "Click to place a building" if m=="BUILD" else "Click to place a lift" if m=="LIFT" else "Select / inspect")
-    if toast_label:
-        toast_label.text="SUMMIT VALLEY — Godot rebuild"
+    if mode=="PISTE":
+        mode_label.text="PISTE MODE  •  Drag across the mountain to draw a BLUE run"
+    elif mode=="BUILD":
+        mode_label.text="BUILD MODE  •  Tap the mountain to build a lodge"
+    elif mode=="LIFT":
+        mode_label.text="LIFT MODE  •  Tap to add a chairlift"
+    elif mode=="UPGRADE":
+        mode_label.text="UPGRADE MODE"
+    else:
+        mode_label.text="SUMMIT VALLEY  •  SELECT / VIEW"
 
-func _unhandled_input(event: InputEvent) -> void:
+func _layout_ui()->void:
+    if not controls: return
+    var s=get_viewport().get_visible_rect().size
+    var compact=s.x<950.0 or s.y<750.0
+    controls.position=Vector2(max(8.0,(s.x-controls.size.x)*0.5),max(8.0,s.y-70.0))
+    mode_label.position=Vector2(18.0,max(155.0,s.y-110.0))
+    if info:
+        info.visible=not compact
+
+func _update_hud()->void:
+    if not hud:return
+    var minute=int(fmod(hour*60.0,60.0))
+    hud.text="SUMMIT VALLEY\n$%0.0f   Guests %d/%d   Rep %d\nDay %d   %02d:%02d   %s\nSnow %0.2fm   Pistes %d   Lifts %d" % [cash,guest_count,guest_capacity,int(reputation),day,int(hour),minute,weather,snow_depth,pistes.size(),lifts.size()]
+    if info:
+        info.text="Ticket $%d   •   Season %d\nBuild: $25k   Upgrade: $%0.0f\nTip: build facilities to increase guest spending." % [int(ticket_price),season,30000.0+buildings.size()*7000.0]
+
+func _toast(t:String)->void:
+    if toast:
+        toast.text=t
+
+func _unhandled_input(event:InputEvent)->void:
+    if event is InputEventKey and event.pressed and not event.echo:
+        if event.keycode==KEY_B:_set_mode("BUILD")
+        elif event.keycode==KEY_P:_set_mode("PISTE")
+        elif event.keycode==KEY_L:_set_mode("LIFT")
+        elif event.keycode==KEY_SPACE:paused=!paused
+        elif event.keycode==KEY_1:game_speed=1.0
+        elif event.keycode==KEY_2:game_speed=3.0
+        elif event.keycode==KEY_3:game_speed=8.0
+        return
+
     if event is InputEventScreenTouch:
         if event.pressed:
-            if mode == "PISTE":
-                painting = true
-                paint_points.clear()
-                var tp = _screen_ground(event.position)
-                if tp != Vector3.INF:
-                    paint_points.append(tp + Vector3.UP * 0.35)
-            elif mode == "BUILD":
-                _place_building(event.position)
-            elif mode == "LIFT":
-                _place_lift(event.position)
-        elif painting:
-            painting = false
-            if paint_points.size() >= 2:
-                _piste(paint_points, "BLUE")
-                toast_label.text = "NEW BLUE PISTE — terrain carving system is next."
+            touch_start=event.position
+            last_touch=event.position
+            touch_mode=mode=="PISTE"
+            if mode=="BUILD":_place_building(event.position)
+            elif mode=="LIFT":_place_lift(event.position)
+            elif mode=="SELECT":_focus_ground(event.position)
+        else:
+            if touch_mode and paint_points.size()>=2:
+                _piste(paint_points,"BLUE")
+                _toast("New BLUE piste opened. Skiers are choosing their own lines.")
+            painting=false
             paint_points.clear()
         return
-    if event is InputEventScreenDrag and painting:
-        var sp = _screen_ground(event.position)
-        if sp != Vector3.INF and (paint_points.is_empty() or paint_points[-1].distance_to(sp) > 2.0):
-            paint_points.append(sp + Vector3.UP * 0.35)
-        return
-    if event is InputEventKey and event.pressed and not event.echo:
-        if event.keycode == KEY_B:
-            _set_mode("BUILD")
-            return
-        if event.keycode == KEY_P:
-            _set_mode("PISTE")
-            return
-        if event.keycode == KEY_L:
-            _set_mode("LIFT")
-            return
-        if event.keycode == KEY_SPACE:
-            paused=!paused
-            return
-    elif event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:
-        if mode=="PISTE":
+
+    if event is InputEventScreenDrag:
+        if touch_mode:
             painting=true
-            paint_points.clear()
             var p=_screen_ground(event.position)
-            if p!=Vector3.INF:
-                paint_points.append(p+Vector3.UP*0.35)
-        elif mode=="BUILD":
-            _place_building(event.position)
-        elif mode=="LIFT":
-            _place_lift(event.position)
+            if p!=Vector3.INF and (paint_points.is_empty() or paint_points[-1].distance_to(p)>2.2):
+                paint_points.append(p+Vector3.UP*0.4)
+        else:
+            var diff=event.position-last_touch
+            camera_yaw-=diff.x*0.25
+            camera_pitch=clamp(camera_pitch-diff.y*0.12,-72.0,-28.0)
+            _update_camera()
+            last_touch=event.position
+        return
+
+    if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT:
+        if event.pressed:
+            if mode=="PISTE":
+                painting=true
+                paint_points.clear()
+                var p=_screen_ground(event.position)
+                if p!=Vector3.INF:paint_points.append(p+Vector3.UP*0.4)
+            elif mode=="BUILD":_place_building(event.position)
+            elif mode=="LIFT":_place_lift(event.position)
+        elif painting:
+            painting=false
+            if paint_points.size()>=2:_piste(paint_points,"BLUE")
+            paint_points.clear()
     elif event is InputEventMouseMotion and painting:
         var p=_screen_ground(event.position)
-        if p!=Vector3.INF and (paint_points.is_empty() or paint_points[-1].distance_to(p)>2.0):
-            paint_points.append(p+Vector3.UP*0.35)
-    elif event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and not event.pressed and painting:
-        painting=false
-        if paint_points.size()>=2:
-            _piste(paint_points,"BLUE")
-            toast_label.text="NEW BLUE PISTE — terrain carving system is next."
-        paint_points.clear()
+        if p!=Vector3.INF and (paint_points.is_empty() or paint_points[-1].distance_to(p)>2.2):
+            paint_points.append(p+Vector3.UP*0.4)
+    elif event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_WHEEL_UP:
+        camera_distance=clamp(camera_distance-7.0,55.0,160.0)
+        _update_camera()
+    elif event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_WHEEL_DOWN:
+        camera_distance=clamp(camera_distance+7.0,55.0,160.0)
+        _update_camera()
 
-func _place_building(screen: Vector2) -> void:
-    var p=_screen_ground(screen)
-    if p==Vector3.INF or cash<25000:
-        return
-    cash-=25000
-    _building("New Alpine Lodge",p,25000)
+func _focus_ground(pos:Vector2)->void:
+    var p=_screen_ground(pos)
+    if p!=Vector3.INF:
+        camera_target=p
+        _update_camera()
 
-func _place_lift(screen: Vector2) -> void:
-    var p=_screen_ground(screen)
-    if p==Vector3.INF:
-        return
-    _lift(p+Vector3.UP*2,p+Vector3(18,20,-36)+Vector3.UP*2,"CHAIRLIFT")
-
-func _screen_ground(pos: Vector2) -> Vector3:
+func _screen_ground(pos:Vector2)->Vector3:
     var origin=camera.project_ray_origin(pos)
     var dir=camera.project_ray_normal(pos)
-    if abs(dir.y)<0.001:
-        return Vector3.INF
-    var t=(8.0-origin.y)/dir.y
-    if t<0:
-        return Vector3.INF
+    if abs(dir.y)<0.0001:return Vector3.INF
+    var t=(camera_target.y-origin.y)/dir.y
+    if t<0:t=0.0
     var p=origin+dir*t
     p.y=terrain_height(p.x,p.z)
     return p
 
-func _update_sun() -> void:
-    var angle=(time_of_day-12.0)*7.5
-    sun.rotation_degrees=Vector3(-35,angle,-20)
-    sun.light_energy=clamp(1.5-abs(time_of_day-13.0)*0.08,0.18,1.5)
+func _update_camera()->void:
+    if not camera:return
+    var yaw=deg_to_rad(camera_yaw)
+    var pitch=deg_to_rad(camera_pitch)
+    var offset=Vector3(cos(pitch)*sin(yaw),-sin(pitch),cos(pitch)*cos(yaw))*camera_distance
+    camera.position=camera_target+offset
+    camera.look_at(camera_target,Vector3.UP)
 
-func _mat(color: Color,rough: float)->StandardMaterial3D:
+func _update_sun()->void:
+    var angle=(hour-12.0)*7.5
+    sun.rotation_degrees=Vector3(-35,angle,-20)
+    sun.light_energy=clamp(1.55-abs(hour-13.0)*0.075,0.2,1.55)
+
+func _place_building(pos:Vector2)->void:
+    var p=_screen_ground(pos)
+    if p==Vector3.INF or cash<25000:
+        _toast("Not enough cash or invalid terrain.")
+        return
+    cash-=25000
+    _building("ALPINE LODGE",p,25000)
+    guest_capacity=min(MAX_GUESTS,guest_capacity+18)
+    _toast("Alpine Lodge built. Guest capacity +18.")
+
+func _place_lift(pos:Vector2)->void:
+    var p=_screen_ground(pos)
+    if p==Vector3.INF or cash<45000:
+        _toast("A chairlift costs $45,000.")
+        return
+    cash-=45000
+    var end=p+Vector3(20,18,-42)
+    end.y=terrain_height(end.x,end.z)+2.5
+    _lift(p+Vector3.UP*2.5,end,"CHAIRLIFT")
+    guest_capacity=min(MAX_GUESTS,guest_capacity+20)
+    _toast("New lift opened. Capacity +20.")
+
+func _building(title:String,pos:Vector3,cost:float)->void:
+    buildings.append({"name":title,"pos":pos,"cost":cost})
+    var root:=Node3D.new()
+    root.position=pos
+    var base:=_box(Vector3(12,7,9),Color("#8e6245"))
+    base.position.y=3.5
+    root.add_child(base)
+    var roof:=_box(Vector3(13,1.4,10),Color("#352a28"))
+    roof.position.y=8.0
+    root.add_child(roof)
+    for x in [-3.8,-1.3,1.3,3.8]:
+        var win:=_box(Vector3(1.45,1.45,0.18),Color("#ffd66e"))
+        win.position=Vector3(x,4.0,-4.6)
+        root.add_child(win)
+    var label:=Label3D.new()
+    label.text=title
+    label.font_size=26
+    label.outline_size=7
+    label.position.y=10
+    root.add_child(label)
+    building_root.add_child(root)
+
+func _save_game()->void:
+    var data={"cash":cash,"reputation":reputation,"guest_capacity":guest_capacity,"ticket_price":ticket_price,"day":day,"season":season,"snow":snow_depth}
+    var file=FileAccess.open("user://"+save_key+".json",FileAccess.WRITE)
+    if file:
+        file.store_string(JSON.stringify(data))
+        file.close()
+        _toast("Game saved.")
+
+func _load_game()->void:
+    if not FileAccess.file_exists("user://"+save_key+".json"):return
+    var file=FileAccess.open("user://"+save_key+".json",FileAccess.READ)
+    var data=JSON.parse_string(file.get_as_text())
+    file.close()
+    if typeof(data)==TYPE_DICTIONARY:
+        cash=float(data.get("cash",cash))
+        reputation=float(data.get("reputation",reputation))
+        guest_capacity=int(data.get("guest_capacity",guest_capacity))
+        ticket_price=float(data.get("ticket_price",ticket_price))
+        day=int(data.get("day",day))
+        season=int(data.get("season",season))
+        snow_depth=float(data.get("snow",snow_depth))
+
+func _pine_mesh()->ArrayMesh:
+    var st:=SurfaceTool.new()
+    st.begin(Mesh.PRIMITIVE_TRIANGLES)
+    var mat:=_mat(Color("#174536"),0.92)
+    st.set_material(mat)
+    for j in range(3):
+        var r=2.7-j*0.65
+        var y=1.4+j*2.0
+        var h=3.5
+        var pts=[Vector3(0,y+h/2,0),Vector3(-r,y-h/2,-r*0.75),Vector3(r,y-h/2,-r*0.75),Vector3(r,y-h/2,r*0.75),Vector3(-r,y-h/2,r*0.75)]
+        for k in range(4):
+            st.add_vertex(pts[0]);st.add_vertex(pts[k+1]);st.add_vertex(pts[((k+1)%4)+1])
+    return st.commit()
+
+func _mat(color:Color,rough:float)->StandardMaterial3D:
     var m:=StandardMaterial3D.new()
     m.albedo_color=color
     m.roughness=rough
     return m
 
-func _box(size: Vector3,color: Color)->MeshInstance3D:
+func _box(size:Vector3,color:Color)->MeshInstance3D:
     var m:=MeshInstance3D.new()
     var b:=BoxMesh.new()
     b.size=size
     m.mesh=b
-    m.material_override=_mat(color,0.75)
+    m.material_override=_mat(color,0.72)
     return m
 
-func _sphere(radius: float,color: Color)->MeshInstance3D:
+func _sphere(radius:float,color:Color)->MeshInstance3D:
     var m:=MeshInstance3D.new()
     var s:=SphereMesh.new()
     s.radius=radius
@@ -609,7 +735,7 @@ func _sphere(radius: float,color: Color)->MeshInstance3D:
     m.material_override=_mat(color,0.65)
     return m
 
-func _cone(radius: float,height: float,color: Color)->MeshInstance3D:
+func _cone(radius:float,height:float,color:Color)->MeshInstance3D:
     var m:=MeshInstance3D.new()
     var c:=CylinderMesh.new()
     c.top_radius=0.0
@@ -619,7 +745,7 @@ func _cone(radius: float,height: float,color: Color)->MeshInstance3D:
     m.material_override=_mat(color,0.9)
     return m
 
-func _cylinder(radius: float,height: float,color: Color)->MeshInstance3D:
+func _cylinder(radius:float,height:float,color:Color)->MeshInstance3D:
     var m:=MeshInstance3D.new()
     var c:=CylinderMesh.new()
     c.top_radius=radius
@@ -629,7 +755,7 @@ func _cylinder(radius: float,height: float,color: Color)->MeshInstance3D:
     m.material_override=_mat(color,0.5)
     return m
 
-func _beam(a: Vector3,b: Vector3,radius: float,color: Color)->MeshInstance3D:
+func _beam(a:Vector3,b:Vector3,radius:float,color:Color)->MeshInstance3D:
     var m:=MeshInstance3D.new()
     var c:=CylinderMesh.new()
     c.top_radius=radius
