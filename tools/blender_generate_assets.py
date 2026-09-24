@@ -78,6 +78,120 @@ def export(name):
     bpy.ops.export_scene.gltf(filepath=path,export_format="GLB",use_selection=True,export_materials="EXPORT",export_apply=True)
     reset()
 
+
+def alpine_mountain():
+    """Build the mountain as one intentional sculpted landform.
+    Run this in Blender 4.x; it exports summit_valley_mountain.glb.
+    The playable mountain is made from broad peaks, bowls, gullies,
+    ridgelines and a flattened village apron rather than primitives."""
+    # 64 x 64 sculpt grid
+    N=64
+    size_x,size_z=190.0,155.0
+    verts=[]; faces=[]
+    def gauss(x,z,cx,cz,sx,sz,h):
+        return h*math.exp(-(((x-cx)/sx)**2+((z-cz)/sz)**2))
+    def terrain(x,z):
+        y=1.8
+        # Three dominant alpine masses + rear summit.
+        y+=gauss(x,z,-48,10,42,48,34)
+        y+=gauss(x,z,5,20,38,45,49)
+        y+=gauss(x,z,46,8,31,39,35)
+        y+=gauss(x,z,-8,61,31,25,39)
+        # Main valley and side bowls.
+        y-=gauss(x,z,0,-42,43,24,16)
+        y-=gauss(x,z,31,-25,25,19,9)
+        # Natural large-scale ridges.
+        y+=3.2*math.sin(x*.055+z*.032)+1.8*math.cos(z*.085-x*.035)
+        # Ski bowls / gullies cut deliberately into the mountain.
+        for cx,cz,sx,sz,depth in [
+            (-33,3,10,31,5.5),(2,2,11,36,6.5),
+            (32,4,9,28,5.0),(-4,34,14,17,4.0)
+        ]:
+            y-=depth*math.exp(-(((x-cx)/sx)**2+((z-cz)/sz)**2))
+        # Village terrace at the bottom.
+        apron=math.exp(-((x/70)**2+((z+55)/17)**2))
+        y=y*(1-apron)+max(y,2.6)*apron
+        return max(.4,y)
+
+    for j in range(N+1):
+        z=-size_z/2+size_z*j/N
+        for i in range(N+1):
+            x=-size_x/2+size_x*i/N
+            verts.append((x,terrain(x,z),z))
+    for j in range(N):
+        for i in range(N):
+            q=j*(N+1)+i
+            faces += [(q,q+1,q+N+1),(q+1,q+N+2,q+N+1)]
+
+    mesh=bpy.data.meshes.new("Summit Valley Sculpted Mountain Mesh")
+    mesh.from_pydata(verts,[],faces); mesh.update()
+    mountain=bpy.data.objects.new("SUMMIT VALLEY — MAIN MOUNTAIN",mesh)
+    bpy.context.collection.objects.link(mountain)
+    apply_mat(mountain,SNOW)
+
+    # Smooth base shading, then add a controlled subdivision.
+    for p in mesh.polygons: p.use_smooth=True
+    sub=mountain.modifiers.new("Alpine surface refinement","SUBSURF")
+    sub.subdivision_type="SIMPLE"; sub.levels=1; sub.render_levels=1
+
+    # Snow/rock material slots. A geometry-nodes style separation is avoided
+    # so the GLB remains lightweight and reliable in PlayCanvas.
+    mountain.data.materials.append(STONE)
+    mountain.data.materials.append(SNOW)
+
+    # Assign exposed rock to steep lower/mid faces.
+    for poly in mesh.polygons:
+        nx=poly.normal.x; ny=poly.normal.y; nz=poly.normal.z
+        steep=1-abs(ny)
+        cy=poly.center.y
+        if steep>.38 and cy<30:
+            poly.material_index=1
+
+    # Distinct snow ridges/cornices as low-profile sculpted strips.
+    def ridge(name,points,width=.9,lift=.25):
+        me=bpy.data.meshes.new(name+" Mesh")
+        vs=[];fs=[]
+        for k,(x,z) in enumerate(points):
+            dx=points[min(k+1,len(points)-1)][0]-points[max(0,k-1)][0]
+            dz=points[min(k+1,len(points)-1)][1]-points[max(0,k-1)][1]
+            ll=max(.001,math.hypot(dx,dz)); nx=-dz/ll; nz=dx/ll
+            y=terrain(x,z)+lift
+            vs += [(x+nx*width,y,z+nz*width),(x-nx*width,y-.08,z-nz*width)]
+        for k in range(len(points)-1):
+            q=k*2;fs.append((q,q+1,q+2));fs.append((q+1,q+3,q+2))
+        me.from_pydata(vs,[],fs);me.update()
+        ob=bpy.data.objects.new(name,me);bpy.context.collection.objects.link(ob);apply_mat(ob,SNOW)
+        return ob
+    ridge("Upper wind lip A",[(-78,30),(-54,37),(-27,42),(0,47),(25,43)],1.5,.5)
+    ridge("Upper wind lip B",[(5,44),(28,39),(54,31),(72,22)],1.25,.45)
+    ridge("Cornice Ridge",[(-45,25),(-27,31),(-8,37),(14,35),(35,29)],1.0,.34)
+
+    # Large faceted cliff faces are separate so the mountain silhouette remains readable.
+    def cliff(cx,cz,w,d,h):
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2,radius=1,location=(cx,terrain(cx,cz)-h*.15,cz))
+        o=bpy.context.object;o.name="Exposed granite cliff";o.scale=(w,h,d)
+        bpy.ops.object.transform_apply(location=False,rotation=False,scale=True);apply_mat(o,STONE)
+        for p in o.data.polygons:p.use_smooth=False
+    for p in [(-49,24,8,5,5),(-25,31,9,5,7),(7,38,10,6,8),(27,28,8,5,6),(48,20,8,5,5)]:
+        cliff(*p)
+
+    # Snow-capped summit domes, deliberately asymmetric.
+    for cx,cz,sx,sz in [(-48,10,23,18),(5,20,27,22),(46,8,20,17),(-8,61,21,14)]:
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2,radius=1,location=(cx,terrain(cx,cz)+2,cz))
+        cap=bpy.context.object;cap.name="Snow capped alpine summit"
+        cap.scale=(sx,5.5,sz)
+        bpy.ops.object.transform_apply(location=False,rotation=False,scale=True);apply_mat(cap,SNOW)
+
+    # Export the complete mountain selection.
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in bpy.context.scene.objects: o.select_set(True)
+    bpy.context.view_layer.objects.active=mountain
+    path=os.path.join(OUT,"summit_valley_mountain.glb")
+    bpy.ops.export_scene.gltf(filepath=path,export_format="GLB",use_selection=True,export_materials="EXPORT",export_apply=True)
+    print("EXPORTED",path)
+    reset()
+
+
 def chalet():
     cube("Stone foundation",(0,.35,0),(9,.7,7),STONE)
     cube("Timber walls",(0,2.05,0),(8.4,3.4,6.4),WOOD)
@@ -170,6 +284,6 @@ def snowmaker():
     export("snowmaker")
 
 reset()
-for fn in (chalet,hotel,pine,skier,chairlift,gondola,snowmaker):
+for fn in (alpine_mountain,chalet,hotel,pine,skier,chairlift,gondola,snowmaker):
     fn()
 print("Summit Valley assets exported to",OUT)
