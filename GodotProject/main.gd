@@ -153,7 +153,12 @@ func _setup_environment() -> void:
 func _build_mountain() -> void:
     var st := SurfaceTool.new()
     st.begin(Mesh.PRIMITIVE_TRIANGLES)
-    st.set_material(_mat(Color("#f3f7fa"), 0.98))
+    var mountain_mat:=_mountain_material()
+    st.set_material(mountain_mat)
+
+    # Vertex-coloured terrain: lower forest floor, exposed rock bands and
+    # high alpine snowfields. This is deliberately more readable than a
+    # single white procedural mesh.
     for z in range(GRID - 1):
         for x in range(GRID - 1):
             var x0 = -MAP_SIZE * 0.5 + x * MAP_SIZE / float(GRID - 1)
@@ -164,42 +169,127 @@ func _build_mountain() -> void:
             var p10 = Vector3(x1, terrain_height(x1,z0), z0)
             var p01 = Vector3(x0, terrain_height(x0,z1), z1)
             var p11 = Vector3(x1, terrain_height(x1,z1), z1)
-            st.add_vertex(p00); st.add_vertex(p10); st.add_vertex(p01)
-            st.add_vertex(p10); st.add_vertex(p11); st.add_vertex(p01)
+            _terrain_vertex(st,p00)
+            _terrain_vertex(st,p10)
+            _terrain_vertex(st,p01)
+            _terrain_vertex(st,p10)
+            _terrain_vertex(st,p11)
+            _terrain_vertex(st,p01)
     st.generate_normals()
     terrain_mesh = MeshInstance3D.new()
-    terrain_mesh.name = "SnowMountain"
+    terrain_mesh.name = "DetailedSnowMountain"
     terrain_mesh.mesh = st.commit()
     add_child(terrain_mesh)
 
-    # Dense lower forest, sparse upper mountain: this makes the elevation readable.
-    var tree_mesh := _pine_mesh()
-    for i in range(115):
-        var x := rng.randf_range(-82.0,82.0)
-        var z := rng.randf_range(-82.0,82.0)
+    # Forest is concentrated in believable lower/mid-mountain bands.
+    for i in range(165):
+        var x := rng.randf_range(-84.0,84.0)
+        var z := rng.randf_range(-84.0,84.0)
         var y := terrain_height(x,z)
-        if y < 10.0 or y > 43.0:
+        if y < 9.0 or y > 45.0:
             continue
-        var tree := MeshInstance3D.new()
-        tree.mesh = tree_mesh
-        tree.material_override = _mat(Color("#173f34"),0.9)
+        # Leave the main pistes and summit bowls more open.
+        if abs(x) < 18.0 and z > -42.0 and z < 28.0 and rng.randf() < 0.58:
+            continue
+        var tree := _detailed_pine()
         tree.position = Vector3(x,y,z)
-        var s := rng.randf_range(0.75,1.35)
-        tree.scale = Vector3(s,s,s)
+        var s := rng.randf_range(0.72,1.28)
+        tree.scale = Vector3(s,s,rng.randf_range(0.78,1.15)*s)
+        tree.rotation.y = rng.randf_range(0,TAU)
         scenery_root.add_child(tree)
 
-    # Summit snowfields make the high points visually distinct.
-    for p in [Vector3(-43,56,18),Vector3(32,69,-24),Vector3(0,44,-57)]:
-        var cap := _cone(13.0,8.0,Color("#ffffff"))
+    # Distinct high-alpine snowfields and cornices.
+    for p in [
+        Vector3(-43,terrain_height(-43,18)+1.0,18),
+        Vector3(32,terrain_height(32,-24)+1.0,-24),
+        Vector3(0,terrain_height(0,-57)+1.0,-57)
+    ]:
+        var cap := _snowfield(16.0)
         cap.position=p
         scenery_root.add_child(cap)
 
-    # A few exposed rock faces break up the otherwise all-white mountain.
-    for p in [Vector3(-58,terrain_height(-58,2)+1.0,2),Vector3(55,terrain_height(55,-12)+1.0,-12),Vector3(5,terrain_height(5,-48)+1.0,-48)]:
-        var rock := _cone(4.5,5.5,Color("#7a858b"))
+    # Rock outcrops and cliff chunks make the fall line much easier to read.
+    var rock_positions=[
+        Vector3(-61,terrain_height(-61,5)+0.7,5),
+        Vector3(57,terrain_height(57,-8)+0.7,-8),
+        Vector3(8,terrain_height(8,-48)+0.7,-48),
+        Vector3(-48,terrain_height(-48,-25)+0.7,-25),
+        Vector3(46,terrain_height(46,20)+0.7,20)
+    ]
+    for p in rock_positions:
+        var rock:=_rock_cluster()
         rock.position=p
-        rock.rotation_degrees=Vector3(0,rng.randf_range(0,360),rng.randf_range(-10,10))
+        rock.rotation.y=rng.randf_range(0,TAU)
+        rock.scale=Vector3(rng.randf_range(0.8,1.5),rng.randf_range(0.8,1.4),rng.randf_range(0.8,1.5))
         scenery_root.add_child(rock)
+
+    # A few groomed snow shelves beside the main village make the resort
+    # footprint read from the overhead management camera.
+    for p in [
+        Vector3(-8,terrain_height(-8,24)+0.3,24),
+        Vector3(20,terrain_height(20,-5)+0.3,-5),
+        Vector3(-25,terrain_height(-25,40)+0.3,40)
+    ]:
+        var apron:=_box(Vector3(18,0.18,12),Color("#e7eef2"))
+        apron.position=p
+        scenery_root.add_child(apron)
+
+func _terrain_vertex(st:SurfaceTool,p:Vector3)->void:
+    var h=p.y
+    var hx=terrain_height(p.x+1.5,p.z)-terrain_height(p.x-1.5,p.z)
+    var hz=terrain_height(p.x,p.z+1.5)-terrain_height(p.x,p.z-1.5)
+    var slope=clamp(sqrt(hx*hx+hz*hz)/12.0,0.0,1.0)
+    var base:Color
+    if h < 14.0:
+        base=Color("#b9c8bd").lerp(Color("#e4ece9"),clamp((h-6.0)/8.0,0.0,1.0))
+    elif h < 28.0:
+        base=Color("#e8edf0").lerp(Color("#f7fafb"),clamp((h-14.0)/14.0,0.0,1.0))
+    elif slope > 0.62 and h < 48.0:
+        base=Color("#aab2b5").lerp(Color("#e7ecee"),0.55)
+    else:
+        base=Color("#f6f9fb")
+    st.set_color(base)
+    st.add_vertex(p)
+
+func _mountain_material()->StandardMaterial3D:
+    var m:=_mat(Color.WHITE,0.96)
+    m.vertex_color_use_as_albedo=true
+    m.cull_mode=BaseMaterial3D.CULL_BACK
+    return m
+
+func _detailed_pine()->Node3D:
+    var root:=Node3D.new()
+    var trunk:=_cylinder(0.20,2.8,Color("#4b382c"))
+    trunk.position.y=1.4
+    root.add_child(trunk)
+    for layer in range(4):
+        var r:=2.4-float(layer)*0.42
+        var cone:=_cone(r,3.0,Color("#205445").lerp(Color("#2f7358"),float(layer)/4.0))
+        cone.position.y=2.1+float(layer)*1.55
+        root.add_child(cone)
+    var snow_cap:=_cone(1.7,1.0,Color("#eef5f7"))
+    snow_cap.position.y=7.0
+    root.add_child(snow_cap)
+    return root
+
+func _snowfield(radius:float)->Node3D:
+    var root:=Node3D.new()
+    var lower:=_cone(radius,3.0,Color("#ffffff"))
+    lower.position.y=0.2
+    root.add_child(lower)
+    var crest:=_cone(radius*0.62,4.0,Color("#f7fbfd"))
+    crest.position.y=1.4
+    root.add_child(crest)
+    return root
+
+func _rock_cluster()->Node3D:
+    var root:=Node3D.new()
+    for i in range(4):
+        var rock:=_cone(rng.randf_range(1.4,3.8),rng.randf_range(2.5,6.0),Color("#667277"))
+        rock.position=Vector3(rng.randf_range(-3.0,3.0),rng.randf_range(0,1.0),rng.randf_range(-2.5,2.5))
+        rock.rotation=Vector3(rng.randf_range(-0.2,0.2),rng.randf_range(0,TAU),rng.randf_range(-0.2,0.2))
+        root.add_child(rock)
+    return root
 
 func _build_initial_resort() -> void:
     _building("ALPINE GRAND HOTEL",Vector3(-8,terrain_height(-8,24),24),65000.0)
@@ -227,30 +317,51 @@ func _render_piste(d: Dictionary) -> void:
     var pts: PackedVector3Array = d["points"]
     if pts.size() < 2: return
     var col: Color = PISTE_COLOURS[d["difficulty"]]
+
+    # Groomed piste surface.
     var st := SurfaceTool.new()
     st.begin(Mesh.PRIMITIVE_TRIANGLES)
-    st.set_material(_mat(col,0.24))
+    st.set_material(_mat(Color("#eef4f7"),0.88))
     for i in range(pts.size()-1):
         var a=pts[i]; var b=pts[i+1]
-        # Keep the piste glued to the actual mountain surface.
-        a.y=terrain_height(a.x,a.z)+0.55
-        b.y=terrain_height(b.x,b.z)+0.55
+        a.y=terrain_height(a.x,a.z)+0.72
+        b.y=terrain_height(b.x,b.z)+0.72
         var side=(b-a).cross(Vector3.UP).normalized()
-        var w=6.2 if d["difficulty"] == "GREEN" else (5.7 if d["difficulty"] == "BLUE" else (5.1 if d["difficulty"] == "RED" else 4.6))
+        var w=7.0 if d["difficulty"]=="GREEN" else (6.4 if d["difficulty"]=="BLUE" else (5.7 if d["difficulty"]=="RED" else 5.0))
         st.add_vertex(a+side*w); st.add_vertex(b+side*w); st.add_vertex(a-side*w)
         st.add_vertex(a-side*w); st.add_vertex(b+side*w); st.add_vertex(b-side*w)
     var mi:=MeshInstance3D.new()
     mi.mesh=st.commit()
     piste_root.add_child(mi)
 
+    # Difficulty-coloured boundary ribbons make the runs obvious from above.
+    for edge in [-1.0,1.0]:
+        var edge_st:=SurfaceTool.new()
+        edge_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+        edge_st.set_material(_mat(col,0.72))
+        for i in range(pts.size()-1):
+            var a=pts[i]; var b=pts[i+1]
+            a.y=terrain_height(a.x,a.z)+0.76
+            b.y=terrain_height(b.x,b.z)+0.76
+            var side=(b-a).cross(Vector3.UP).normalized()
+            var center_a=a+side*(edge*5.8)
+            var center_b=b+side*(edge*5.8)
+            var inner_a=a+side*(edge*5.45)
+            var inner_b=b+side*(edge*5.45)
+            edge_st.add_vertex(inner_a);edge_st.add_vertex(center_a);edge_st.add_vertex(inner_b)
+            edge_st.add_vertex(center_a);edge_st.add_vertex(center_b);edge_st.add_vertex(inner_b)
+        var edge_mesh:=MeshInstance3D.new()
+        edge_mesh.mesh=edge_st.commit()
+        piste_root.add_child(edge_mesh)
+
     for i in range(pts.size()-1):
         var a=pts[i]; var b=pts[i+1]
-        var count=max(1,int(a.distance_to(b)/6.0))
+        var count=max(1,int(a.distance_to(b)/7.0))
         var side=(b-a).cross(Vector3.UP).normalized()
         for j in range(count):
             var t=(float(j)+0.5)/float(count)
-            _piste_marker(a.lerp(b,t)+side*5.7,col)
-            _piste_marker(a.lerp(b,t)-side*5.7,col)
+            _piste_marker(a.lerp(b,t)+side*6.0,col)
+            _piste_marker(a.lerp(b,t)-side*6.0,col)
 
     var sign:=Label3D.new()
     sign.text=d["name"]
@@ -938,22 +1049,49 @@ func _building(title:String,pos:Vector3,cost:float)->void:
     buildings.append({"name":title,"pos":pos,"cost":cost})
     var root:=Node3D.new()
     root.position=pos
-    var base:=_box(Vector3(12,7,9),Color("#8e6245"))
-    base.position.y=3.5
+
+    var base:=_box(Vector3(12,6.5,9),Color("#76513e"))
+    base.position.y=3.25
     root.add_child(base)
-    var roof:=_box(Vector3(13,1.4,10),Color("#352a28"))
-    roof.position.y=8.0
+    var upper:=_box(Vector3(10.5,2.5,8.0),Color("#b77b51"))
+    upper.position=Vector3(0,7.5,0)
+    root.add_child(upper)
+
+    # Deep alpine roof with overhang and snow layer.
+    var roof:=_box(Vector3(14.5,1.0,10.8),Color("#252c31"))
+    roof.position.y=9.2
+    roof.rotation.z=deg_to_rad(5.0)
     root.add_child(roof)
+    var roof_snow:=_box(Vector3(14.8,0.38,11.1),Color("#eef4f6"))
+    roof_snow.position.y=9.75
+    roof_snow.rotation.z=deg_to_rad(5.0)
+    root.add_child(roof_snow)
+
     for x in [-3.8,-1.3,1.3,3.8]:
-        var win:=_box(Vector3(1.45,1.45,0.18),Color("#ffd66e"))
-        win.position=Vector3(x,4.0,-4.6)
+        var win:=_box(Vector3(1.35,1.55,0.16),Color("#ffd66e"))
+        win.position=Vector3(x,4.0,-4.58)
         root.add_child(win)
-    var label:=Label3D.new()
-    label.text=title
-    label.font_size=26
-    label.outline_size=7
-    label.position.y=10
-    root.add_child(label)
+        var upper_win:=_box(Vector3(1.15,1.0,0.16),Color("#f6c96a"))
+        upper_win.position=Vector3(x,7.55,-4.1)
+        root.add_child(upper_win)
+
+    var door:=_box(Vector3(1.5,2.5,0.18),Color("#3b2a25"))
+    door.position=Vector3(0,1.35,-4.62)
+    root.add_child(door)
+
+    var chimney:=_box(Vector3(0.7,2.2,0.7),Color("#4c3d38"))
+    chimney.position=Vector3(3.1,10.5,1.0)
+    root.add_child(chimney)
+    var chimney_cap:=_box(Vector3(1.0,0.25,1.0),Color("#2f2927"))
+    chimney_cap.position=Vector3(3.1,11.7,1.0)
+    root.add_child(chimney_cap)
+
+    var sign:=Label3D.new()
+    sign.text=title
+    sign.font_size=24
+    sign.outline_size=7
+    sign.position.y=12.5
+    root.add_child(sign)
     building_root.add_child(root)
 
 func _save_game()->void:
