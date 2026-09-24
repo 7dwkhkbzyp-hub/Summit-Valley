@@ -1,4 +1,4 @@
-name: Build Summit Valley Godot Web
+name: Build and Deploy Summit Valley Godot
 
 on:
   push:
@@ -6,23 +6,39 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
-  export:
+  build:
     runs-on: ubuntu-latest
     container:
       image: barichello/godot-ci:4.4.1
     steps:
       - uses: actions/checkout@v4
-      - name: Prepare Godot project
+      - name: Validate Godot project
         run: godot --headless --path GodotProject --editor --quit
       - name: Export Web
         run: |
-          mkdir -p build/web
+          mkdir -p GodotProject/build/web
           godot --headless --path GodotProject --export-release "Web" build/web/index.html
-      - name: Publish to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: build/web
+          path: GodotProject/build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
