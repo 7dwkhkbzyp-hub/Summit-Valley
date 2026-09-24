@@ -106,6 +106,7 @@ func _process(delta: float) -> void:
         _weather_tick()
     _animate_guests(dt)
     _animate_lifts(dt)
+    _snowmaking_tick(dt)
     _update_sun()
     _update_hud()
 
@@ -116,6 +117,15 @@ func terrain_height(x: float, z: float) -> float:
     var valley = -18.0 * exp(-(x ** 2 / 1500.0 + (z - 15.0) ** 2 / 1900.0))
     var ridges = 5.5 * sin(x * 0.055) * cos(z * 0.045)
     return max(1.5, 7.0 + peak_a + peak_b + peak_c + valley + ridges)
+
+func _mountain_color(y:float)->Color:
+    if y<13.0:
+        return Color("#b9cad5")
+    if y<25.0:
+        return Color("#dce6ec")
+    if y<42.0:
+        return Color("#edf3f7")
+    return Color("#ffffff")
 
 func _setup_environment() -> void:
     world_env = WorldEnvironment.new()
@@ -143,7 +153,9 @@ func _setup_environment() -> void:
 func _build_mountain() -> void:
     var st := SurfaceTool.new()
     st.begin(Mesh.PRIMITIVE_TRIANGLES)
-    st.set_material(_mat(Color("#eaf1f5"), 0.94))
+    var mountain_mat:=_mat(Color("#eaf1f5"),0.96)
+    mountain_mat.vertex_color_use_as_albedo=true
+    st.set_material(mountain_mat)
     for z in range(GRID - 1):
         for x in range(GRID - 1):
             var x0 = -MAP_SIZE * 0.5 + x * MAP_SIZE / float(GRID - 1)
@@ -154,8 +166,14 @@ func _build_mountain() -> void:
             var p10 = Vector3(x1, terrain_height(x1,z0), z0)
             var p01 = Vector3(x0, terrain_height(x0,z1), z1)
             var p11 = Vector3(x1, terrain_height(x1,z1), z1)
-            st.add_vertex(p00); st.add_vertex(p10); st.add_vertex(p01)
-            st.add_vertex(p10); st.add_vertex(p11); st.add_vertex(p01)
+            var c00:=_mountain_color(p00.y); var c10:=_mountain_color(p10.y)
+            var c01:=_mountain_color(p01.y); var c11:=_mountain_color(p11.y)
+            st.set_color(c00); st.add_vertex(p00)
+            st.set_color(c10); st.add_vertex(p10)
+            st.set_color(c01); st.add_vertex(p01)
+            st.set_color(c10); st.add_vertex(p10)
+            st.set_color(c11); st.add_vertex(p11)
+            st.set_color(c01); st.add_vertex(p01)
     st.generate_normals()
     terrain_mesh = MeshInstance3D.new()
     terrain_mesh.name = "SnowMountain"
@@ -207,6 +225,10 @@ func _build_initial_resort() -> void:
     _lift(Vector3(-32,terrain_height(-32,32)+2.5,32),Vector3(-72,terrain_height(-72,-72)+2.5,-72),"EXPRESS QUAD")
     _lift(Vector3(48,terrain_height(48,28)+2.5,28),Vector3(74,terrain_height(74,-70)+2.5,-70),"GONDOLA 2")
     _lift(Vector3(-55,terrain_height(-55,55)+2.5,55),Vector3(-82,terrain_height(-82,8)+2.5,8),"SIX-PACK")
+    _snow_cannon(Vector3(-15,terrain_height(-15,-18)+1.0,-18),Vector3(-7,terrain_height(-7,-8)+0.8,-8))
+    _snow_cannon(Vector3(29,terrain_height(29,-20)+1.0,-20),Vector3(21,terrain_height(21,-9)+0.8,-9))
+    _snow_cannon(Vector3(-57,terrain_height(-57,-28)+1.0,-28),Vector3(-43,terrain_height(-43,-5)+0.8,-5))
+    _snow_cannon(Vector3(68,terrain_height(68,-24)+1.0,-24),Vector3(57,terrain_height(57,7)+0.8,7))
 
 func _piste(points: Array, difficulty: String) -> void:
     var d = {"points":PackedVector3Array(points),"difficulty":difficulty,"condition":100.0,"open":true,"name":difficulty+" RUN "+str(pistes.size()+1)}
@@ -341,6 +363,33 @@ func _lift_cable_position(data:Dictionary,t:float,run:float)->Vector3:
     var y:=9.5-sin(t*PI)*2.2
     return a.lerp(b,t)+Vector3.UP*y+side*(run*2.15)
 
+func _snow_cannon(pos:Vector3,target:Vector3)->void:
+    var root:=Node3D.new()
+    root.position=pos
+    var base:=_cylinder(0.75,0.35,Color("#3f4b52"))
+    base.position.y=0.2
+    root.add_child(base)
+    var body:=_box(Vector3(0.65,1.2,0.65),Color("#d9e0e4"))
+    body.position.y=0.95
+    root.add_child(body)
+    var nozzle:=_cylinder(0.18,1.4,Color("#edf2f4"))
+    nozzle.position=Vector3(0,1.75,0)
+    nozzle.look_at(target+Vector3.UP*1.5,Vector3.UP)
+    nozzle.rotate_object_local(Vector3.RIGHT,PI*0.5)
+    root.add_child(nozzle)
+    for j in range(4):
+        var plume:=_sphere(0.28,Color(0.92,0.97,1.0,0.72))
+        plume.position=Vector3(0,2.0,-0.7-float(j)*0.65)
+        plume.scale=Vector3(1.4,0.8,1.0)
+        root.add_child(plume)
+    root.set_meta("target",target)
+    scenery_root.add_child(root)
+
+func _snowmaking_tick(dt:float)->void:
+    for p in pistes:
+        p["condition"]=clamp(float(p["condition"])+0.002*dt,35.0,100.0)
+    snow_depth=clamp(snow_depth+0.00025*dt,0.35,2.5)
+
 func _lift_station(pos:Vector3,side:String,type_name:String)->void:
     var root:=Node3D.new()
     root.position=pos
@@ -386,6 +435,38 @@ func _spawn_guest(i:int)->void:
     }
     guests.append(g)
     guest_root.add_child(n)
+
+func _skier(i:int)->Node3D:
+    var n:=Node3D.new()
+    n.name="Skier_"+str(i)
+    var jackets=[Color("#d84b42"),Color("#397bc5"),Color("#e2a52f"),Color("#744db1"),Color("#24a578"),Color("#ed7834")]
+    var jacket=jacket jackets[i%jackets.size()] if false else jackets[i%jackets.size()]
+    var body:=_box(Vector3(0.62,1.2,0.48),jacket)
+    body.position.y=1.12
+    n.add_child(body)
+    var head:=_sphere(0.39,Color("#efc5a5"))
+    head.position.y=2.02
+    n.add_child(head)
+    var helmet:=_sphere(0.44,Color("#20262b"))
+    helmet.scale=Vector3(1,0.64,1)
+    helmet.position.y=2.28
+    n.add_child(helmet)
+    var goggles:=_box(Vector3(0.43,0.13,0.10),Color("#73c8dc"))
+    goggles.position=Vector3(0,2.07,-0.34)
+    n.add_child(goggles)
+    var pants:=_box(Vector3(0.68,0.72,0.5),Color("#252b33"))
+    pants.position.y=0.42
+    n.add_child(pants)
+    for side in [-1.0,1.0]:
+        var ski:=_box(Vector3(0.10,0.07,2.15),Color("#f4f6f7"))
+        ski.position=Vector3(side*0.22,0.10,0)
+        n.add_child(ski)
+        var boot:=_box(Vector3(0.20,0.22,0.45),Color("#15191d"))
+        boot.position=Vector3(side*0.22,0.22,-0.18)
+        n.add_child(boot)
+    n.add_child(_beam(Vector3(-0.32,1.55,0),Vector3(-0.58,1.0,-0.15),0.09,jacket))
+    n.add_child(_beam(Vector3(0.32,1.55,0),Vector3(0.58,1.0,-0.15),0.09,jacket))
+    return n
 
 func _nearest_lift_to_point(p:Vector3)->int:
     var best:=-1
