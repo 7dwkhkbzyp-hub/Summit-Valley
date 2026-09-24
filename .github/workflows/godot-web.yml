@@ -22,6 +22,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Godot export templates
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates
+          mkdir -p ~/.config
+          if [ -d /root/.config/godot ]; then mv /root/.config/godot ~/.config/godot; fi
+          if [ -d /root/.local/share/godot/export_templates/4.4.1.stable ]; then
+            mv /root/.local/share/godot/export_templates/4.4.1.stable ~/.local/share/godot/export_templates/4.4.1.stable
+          fi
+          test -f ~/.local/share/godot/export_templates/4.4.1.stable/web_nothreads_release.zip
+
       - name: Validate Godot project
         working-directory: GodotProject
         run: godot --headless --editor --quit
