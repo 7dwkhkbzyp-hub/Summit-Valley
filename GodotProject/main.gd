@@ -36,6 +36,8 @@ var lifts: Array = []
 var buildings: Array = []
 var guests: Array = []
 var rng := RandomNumberGenerator.new()
+var mobile_bar: HBoxContainer
+var mobile_buttons: Array[Button] = []
 
 func _ready() -> void:
     rng.seed = 90210
@@ -53,6 +55,8 @@ func _ready() -> void:
     _spawn_guests(85)
     _ui()
     _set_mode("SELECT")
+    get_viewport().size_changed.connect(_layout_ui)
+    _layout_ui()
 
 func _process(delta: float) -> void:
     if paused:
@@ -284,6 +288,37 @@ func _ui() -> void:
     help.add_theme_font_size_override("font_size",16)
     layer.add_child(help)
 
+    mobile_bar = HBoxContainer.new()
+    mobile_bar.name = "MobileControls"
+    mobile_bar.add_theme_constant_override("separation", 10)
+    layer.add_child(mobile_bar)
+    for item in [["SELECT","SELECT"],["BUILD","BUILD"],["PISTE","PISTE"],["LIFT","LIFT"],["PAUSE","PAUSE"]]:
+        var b := Button.new()
+        b.text = item[0]
+        b.custom_minimum_size = Vector2(118,58)
+        b.add_theme_font_size_override("font_size",18)
+        b.pressed.connect(_mobile_action.bind(item[1]))
+        mobile_bar.add_child(b)
+        mobile_buttons.append(b)
+
+func _mobile_action(action: String) -> void:
+    if action == "PAUSE":
+        paused = !paused
+        return
+    _set_mode(action)
+
+func _layout_ui() -> void:
+    if not mobile_bar or not hud:
+        return
+    var size := get_viewport().get_visible_rect().size
+    var compact := size.x < 900.0 or size.y < 700.0
+    mobile_bar.position = Vector2(max(12.0,(size.x-mobile_bar.size.x)*0.5), max(12.0,size.y-78.0))
+    mobile_bar.visible = compact
+    mode_label.position = Vector2(20, max(160.0,size.y-125.0))
+    var help = get_node_or_null("CanvasLayer/KeyboardHelp")
+    if help:
+        help.visible = not compact
+
 func _update_hud() -> void:
     if hud:
         var mins=int(fmod(time_of_day*60.0,60.0))
@@ -297,6 +332,30 @@ func _set_mode(m: String) -> void:
         toast_label.text="SUMMIT VALLEY — Godot rebuild"
 
 func _unhandled_input(event: InputEvent) -> void:
+    if event is InputEventScreenTouch:
+        if event.pressed:
+            if mode == "PISTE":
+                painting = true
+                paint_points.clear()
+                var tp = _screen_ground(event.position)
+                if tp != Vector3.INF:
+                    paint_points.append(tp + Vector3.UP * 0.35)
+            elif mode == "BUILD":
+                _place_building(event.position)
+            elif mode == "LIFT":
+                _place_lift(event.position)
+        elif painting:
+            painting = false
+            if paint_points.size() >= 2:
+                _piste(paint_points, "BLUE")
+                toast_label.text = "NEW BLUE PISTE — terrain carving system is next."
+            paint_points.clear()
+        return
+    if event is InputEventScreenDrag and painting:
+        var sp = _screen_ground(event.position)
+        if sp != Vector3.INF and (paint_points.is_empty() or paint_points[-1].distance_to(sp) > 2.0):
+            paint_points.append(sp + Vector3.UP * 0.35)
+        return
     if event is InputEventKey and event.pressed and not event.echo:
         if event.keycode == KEY_B:
             _set_mode("BUILD")
