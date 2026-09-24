@@ -1,6 +1,6 @@
 [application]
 config/name="Summit Valley"
-run/main_scene="res://main.tscn"
+run/main_scene="res://foundation.tscn"
 config/features=PackedStringArray("4.4", "GL Compatibility")
 
 [display]
@@ -8,11 +8,11 @@ window/size/viewport_width=720
 window/size/viewport_height=1280
 window/size/window_width_override=720
 window/size/window_height_override=1280
-window/size/window_width_override_web=720
-window/size/window_height_override_web=1280
+window/window_width_override_web=720
+window/window_height_override_web=1280
+window/handheld/orientation=1
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
-window/handheld/orientation=1
 
 [rendering]
 renderer/rendering_method="gl_compatibility"
