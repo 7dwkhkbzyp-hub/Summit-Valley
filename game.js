@@ -1,38 +1,376 @@
 import * as pc from "https://cdn.jsdelivr.net/npm/playcanvas@2.5.0/build/playcanvas.mjs";
+
 const canvas=document.getElementById("application-canvas");
 const app=new pc.Application(canvas,{graphicsDeviceOptions:{alpha:false,antialias:true,preserveDrawingBuffer:false}});
-app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);app.setCanvasResolution(pc.RESOLUTION_AUTO);app.scene.ambientLight=new pc.Color(.42,.5,.62);
-const sun=new pc.Entity("Alpine Sun");sun.addComponent("light",{type:"directional",color:new pc.Color(1,.94,.84),intensity:2.2,castShadows:true,shadowDistance:140,shadowResolution:1024});sun.setEulerAngles(38,-32,0);app.root.addChild(sun);app.scene.exposure=1.05;app.start();
-const mats={};function mat(n,c,r=.8,m=0){const x=new pc.StandardMaterial();x.diffuse=new pc.Color(c[0],c[1],c[2]);x.roughness=r;x.metalness=m;x.useMetalness=true;x.name=n;x.update();mats[n]=x;return x}
-const snow=mat("snow",[.88,.93,.96],.95),snow2=mat("sunlit snow",[.97,.98,1],.9),rock=mat("rock",[.25,.28,.3]),pine=mat("pine",[.035,.16,.105]),pine2=mat("pine tips",[.08,.28,.16]),wood=mat("dark timber",[.22,.12,.07]),roof=mat("roof",[.12,.07,.055]),glass=mat("windows",[.07,.22,.3],.18,.25),red=mat("red piste",[.62,.06,.045]),blue=mat("blue piste",[.04,.25,.68]),green=mat("green piste",[.08,.46,.18]),black=mat("black piste",[.06,.065,.075]),steel=mat("lift steel",[.34,.38,.42],.4,.8),chair=mat("chair",[.8,.08,.06],.55,.25),skin=mat("skin",[.72,.46,.32]),jacket=mat("jacket",[.08,.22,.58]),pants=mat("pants",[.04,.05,.07]),yellow=mat("sign",[.95,.63,.08]);
-function entity(n,p,s,pos,m,parent){const e=new pc.Entity(n);e.addComponent("render",{type:p});e.setLocalScale(s[0],s[1],s[2]);e.setLocalPosition(pos[0],pos[1],pos[2]);e.render.material=m;(parent||app.root).addChild(e);return e}
-const box=(n,s,p,m,q)=>entity(n,"box",s,p,m,q),sphere=(n,s,p,m,q)=>entity(n,"sphere",s,p,m,q),cyl=(n,s,p,m,q)=>entity(n,"cylinder",s,p,m,q),cone=(n,s,p,m,q)=>entity(n,"cone",s,p,m,q);
-const W=150,D=110;
-function height(x,z){return 2+25*Math.exp(-((x+32)**2/2888+(z-5)**2/3528))+17*Math.exp(-((x-28)**2/1568+(z+8)**2/2048))+15*Math.exp(-((x-4)**2/968+(z-34)**2/648))-9*Math.exp(-((x+3)**2/338+(z+18)**2/1800))+3*Math.sin(x*.11+z*.045)+2*Math.cos(z*.13-x*.04)}
-function terrain(){const v=[],ix=[],N=62;for(let z=0;z<=N;z++)for(let x=0;x<=N;x++){const X=-75+150*x/N,Z=-55+110*z/N;v.push(X,height(X,Z),Z)}for(let z=0;z<N;z++)for(let x=0;x<N;x++){const i=z*(N+1)+x;ix.push(i,i+1,i+N+1,i+1,i+N+2,i+N+1)}const mesh=new pc.Mesh(app.graphicsDevice);mesh.setPositions(v);mesh.setIndices(ix);mesh.update(pc.PRIMITIVE_TRIANGLES);const e=new pc.Entity("Alpine Mountain");e.addComponent("render",{type:"asset"});e.render.meshInstances=[new pc.MeshInstance(mesh,snow)];app.root.addChild(e)}
-terrain();
-function tree(x,z,s){const y=height(x,z),e=new pc.Entity("Fir");e.setLocalPosition(x,y,z);app.root.addChild(e);cyl("trunk",[.22*s,.9*s,.22*s],[0,.45*s,0],wood,e);for(let i=0;i<3;i++)cone("foliage",[1.15*s,(2.4-i*.35)*s,1.15*s],[0,(1.25+i*.75)*s,0],i===2?pine2:pine,e)}
-for(let i=0;i<95;i++){const x=-70+Math.random()*140,z=-48+Math.random()*90,y=height(x,z);if(y>4&&y<27&&Math.random()>.18)tree(x,z,.55+Math.random()*.75)}
-function piste(n,pts,m,w){const root=new pc.Entity(n);app.root.addChild(root);for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1],dx=b[0]-a[0],dz=b[1]-a[1],len=Math.hypot(dx,dz),ang=Math.atan2(dx,dz)*180/Math.PI,y=(height(a[0],a[1])+height(b[0],b[1]))/2+.14,s=box(n+" section",[w,.12,len/2],[(a[0]+b[0])/2,y,(a[1]+b[1])/2],m,root);s.setLocalEulerAngles(0,ang,0)}}
-const paths=[[[-37,32],[-32,20],[-25,10],[-16,1],[-8,-9],[0,-20]],[[25,31],[21,23],[16,15],[12,5],[8,-7],[5,-20]],[[-2,36],[4,27],[8,18],[13,9],[18,0],[20,-10]]];
-piste("GREEN Meadow Run",paths[0],green,3.8);piste("RED Ridge Runner",paths[1],red,4.2);piste("BLUE Glacier Way",paths[2],blue,4);piste("BLACK Couloir",[[42,27],[35,20],[31,12],[27,2],[25,-10]],black,3.1);piste("BLUE Village Link",[[-24,-2],[-15,-9],[-8,-16],[2,-20],[14,-19]],blue,3.2);
-function chalet(n,x,z,s){const y=height(x,z),e=new pc.Entity(n);e.setLocalPosition(x,y,z);e.setLocalScale(s,s,s);app.root.addChild(e);box("walls",[8,4.4,6],[0,2.2,0],wood,e);box("roof",[9.2,1.2,7.2],[0,5,0],roof,e);box("ridge",[9.5,.35,.35],[0,5.7,0],roof,e);for(const sx of[-3,3]){box("window",[1.7,1.35,.12],[sx,2.55,3.03],glass,e);box("window mullion",[.12,1.35,.15],[sx,2.55,3.12],yellow,e)}box("door",[1.1,2,.16],[0,1,3.06],wood,e);cyl("chimney",[.65,1.4,.65],[2.3,5.7,1.4],roof,e)}
-chalet("Summit Lodge",-4,-24,1.3);chalet("Piste House",18,-16,.9);chalet("Mountain Hotel",-24,-15,1.25);
-function station(n,x,z){const y=height(x,z),e=new pc.Entity(n);e.setLocalPosition(x,y,z);app.root.addChild(e);box("station",[5,3,4],[0,1.5,0],steel,e);box("roof",[6,.45,5],[0,3.1,0],roof,e);box("entry",[2,.1,.2],[0,.6,2.1],glass,e)}
-function lift(n,a,b,count){const root=new pc.Entity(n);app.root.addChild(root);const ax=a[0],az=a[1],bx=b[0],bz=b[1],ay=height(ax,az)+3,by=height(bx,bz)+3,dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz),ang=Math.atan2(dx,dz);station(n+" base",ax,az);station(n+" summit",bx,bz);for(let i=1;i<7;i++){const t=i/7,x=ax+dx*t,z=az+dz*t,y=ay+(by-ay)*t;cyl(n+" tower",[.28,5,.28],[x,y-2.5,z],steel,root);box("crossarm",[3,.18,.3],[x,y,z],steel,root)}const cable=box("haul rope",[.07,.07,len],[(ax+bx)/2,(ay+by)/2,(az+bz)/2],steel,root);cable.setLocalEulerAngles(0,ang,Math.atan2(by-ay,len)*180/Math.PI);const carriers=[];for(let i=0;i<count;i++){const e=new pc.Entity(n+" chair "+i);root.addChild(e);e._phase=i/count;e._a=[ax,ay,az];e._b=[bx,by,bz];box("seat",[1.2,.18,.5],[0,-.55,0],chair,e);box("back",[1.2,.7,.12],[0,-.15,0],chair,e);box("hanger",[.08,1.5,.08],[0,.55,0],steel,e);carriers.push(e)}return carriers}
-const lift1=lift("Eagle Express",[-4,-22],[-32,28],10),lift2=lift("Glacier Chair",[18,-15],[4,36],9),lift3=lift("Ridge Gondola",[27,-8],[43,29],7);
+app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);
+app.setCanvasResolution(pc.RESOLUTION_AUTO);
+app.scene.ambientLight=new pc.Color(.34,.42,.54);
+app.scene.fog="linear";
+app.scene.fogStart=85;
+app.scene.fogEnd=190;
+app.scene.fogColor=new pc.Color(.60,.74,.86);
+
+const sun=new pc.Entity("Alpine Sun");
+sun.addComponent("light",{type:"directional",color:new pc.Color(1,.95,.86),intensity:2.7,castShadows:true,shadowDistance:180,shadowResolution:2048});
+sun.setEulerAngles(42,-35,0);
+app.root.addChild(sun);
+app.scene.exposure=1.08;
+app.start();
+
+const mats={};
+function mat(n,c,r=.8,m=0,em=0){
+  const x=new pc.StandardMaterial();
+  x.diffuse=new pc.Color(c[0],c[1],c[2]);
+  x.roughness=r;x.metalness=m;x.useMetalness=true;x.name=n;
+  if(em){x.emissive=new pc.Color(c[0]*em,c[1]*em,c[2]*em);x.emissiveIntensity=em}
+  x.update();mats[n]=x;return x;
+}
+const snow=mat("Mountain snow",[.78,.86,.94],.98);
+const snowBright=mat("Fresh snow",[.97,.99,1],.94);
+const snowShade=mat("Snow shadow",[.62,.72,.82],1);
+const rock=mat("Exposed alpine rock",[.20,.23,.25],.94);
+const rockLight=mat("Rock highlights",[.34,.36,.37],.9);
+const pine=mat("Deep fir",[.025,.12,.075],.98);
+const pine2=mat("Fir snow",[.16,.30,.24],.92);
+const trunk=mat("Timber",[.20,.105,.055],.9);
+const timber=mat("Chalet timber",[.30,.16,.075],.82);
+const roof=mat("Dark roof",[.075,.055,.05],.72);
+const roofSnow=mat("Roof snow",[.86,.92,.96],.95);
+const glass=mat("Warm windows",[.05,.22,.29],.12,.25,.35);
+const warm=mat("Window glow",[1,.48,.10],.18,0,.8);
+const steel=mat("Lift steel",[.30,.34,.38],.34,.82);
+const cable=mat("Lift cable",[.035,.04,.045],.55,.75);
+const chair=mat("Chair seats",[.72,.055,.045],.42,.25);
+const gondola=mat("Gondola cabins",[.08,.25,.32],.18,.5);
+const green=mat("Green piste",[.10,.54,.20],.78);
+const blue=mat("Blue piste",[.055,.30,.78],.78);
+const red=mat("Red piste",[.72,.075,.045],.72);
+const black=mat("Black piste",[.045,.05,.06],.65);
+const pisteEdge=mat("Piste edge",[.92,.96,.99],.95);
+const yellow=mat("Mountain signs",[1,.67,.08],.45);
+const jacket=mat("Skier jacket",[.08,.25,.72],.68);
+const jacket2=mat("Skier red jacket",[.72,.08,.055],.68);
+const jacket3=mat("Skier green jacket",[.05,.40,.22],.68);
+const pants=mat("Skier pants",[.035,.045,.06],.72);
+const skin=mat("Skin",[.70,.43,.27],.82);
+const board=mat("Snowboard",[.10,.11,.13],.45,.35);
+
+function entity(n,p,s,pos,m,parent=app.root){
+  const e=new pc.Entity(n);
+  e.addComponent("render",{type:p});
+  e.setLocalScale(s[0],s[1],s[2]);
+  e.setLocalPosition(pos[0],pos[1],pos[2]);
+  e.render.material=m;
+  parent.addChild(e);
+  return e;
+}
+const box=(n,s,p,m,q)=>entity(n,"box",s,p,m,q);
+const sphere=(n,s,p,m,q)=>entity(n,"sphere",s,p,m,q);
+const cyl=(n,s,p,m,q)=>entity(n,"cylinder",s,p,m,q);
+const cone=(n,s,p,m,q)=>entity(n,"cone",s,p,m,q);
+
+const W=160,D=125;
+function height(x,z){
+  const main=31*Math.exp(-((x+30)**2/3000+(z-2)**2/3700));
+  const west=18*Math.exp(-((x-25)**2/1900+(z+1)**2/2400));
+  const peak=24*Math.exp(-((x-4)**2/1250+(z-34)**2/720));
+  const shoulder=11*Math.exp(-((x+57)**2/1600+(z-22)**2/1800));
+  const valley=-10*Math.exp(-((x+2)**2/520+(z+18)**2/1900));
+  const gullies=-4*Math.sin(x*.075+z*.045)**2-2.2*Math.cos(z*.16-x*.06);
+  return Math.max(0.5,3+main+west+peak+shoulder+valley+gullies);
+}
+
+function meshEntity(name,positions,indices,material){
+  const mesh=new pc.Mesh(app.graphicsDevice);
+  mesh.setPositions(positions);
+  mesh.setIndices(indices);
+  mesh.update(pc.PRIMITIVE_TRIANGLES);
+  const e=new pc.Entity(name);
+  e.addComponent("render",{type:"asset"});
+  e.render.meshInstances=[new pc.MeshInstance(mesh,material)];
+  app.root.addChild(e);
+  return e;
+}
+
+function buildTerrain(){
+  const N=82,v=[],ix=[];
+  for(let z=0;z<=N;z++) for(let x=0;x<=N;x++){
+    const X=-W/2+W*x/N,Z=-D/2+D*z/N;
+    v.push(X,height(X,Z),Z);
+  }
+  for(let z=0;z<N;z++) for(let x=0;x<N;x++){
+    const i=z*(N+1)+x;
+    ix.push(i,i+1,i+N+1,i+1,i+N+2,i+N+1);
+  }
+  meshEntity("Sculpted Alpine Mountain",v,ix,snow);
+
+  // Exposed rock faces and summit bands.
+  const patches=[
+    [-7,39,9,8,2.0],[-42,23,11,7,1.4],[22,26,10,7,1.7],[42,17,8,9,1.0],
+    [-54,9,7,6,1.0],[5,31,7,6,2.2]
+  ];
+  patches.forEach((p,k)=>{
+    const [cx,cz,sx,sz,drop]=p;
+    const verts=[],inds=[];
+    const n=8;
+    for(let j=0;j<=n;j++)for(let i=0;i<=n;i++){
+      const u=i/n*2-1,w=j/n*2-1;
+      const X=cx+u*sx,Z=cz+w*sz;
+      verts.push(X,height(X,Z)-drop-.15*Math.sin(i*1.7+j),Z);
+    }
+    for(let j=0;j<n;j++)for(let i=0;i<n;i++){
+      const q=j*(n+1)+i;inds.push(q,q+1,q+n+1,q+1,q+n+2,q+n+1);
+    }
+    meshEntity("Rock face "+k,verts,inds,k%2?rock:rockLight);
+  });
+}
+buildTerrain();
+
+function tree(x,z,s=1){
+  const y=height(x,z);
+  const e=new pc.Entity("Alpine fir");
+  e.setLocalPosition(x,y-.05,z);
+  app.root.addChild(e);
+  cyl("trunk",[.22*s,.9*s,.22*s],[0,.45*s,0],trunk,e);
+  cone("lower boughs",[1.25*s,2.1*s,1.25*s],[0,1.35*s,0],pine,e);
+  cone("middle boughs",[1.0*s,1.85*s,1.0*s],[0,2.35*s,0],pine,e);
+  cone("top boughs",[.68*s,1.65*s,.68*s],[0,3.05*s,0],pine2,e);
+}
+for(let i=0;i<135;i++){
+  const x=-76+Math.random()*152,z=-58+Math.random()*112,y=height(x,z);
+  if(y>4&&y<30&&Math.random()>.12) tree(x,z,.45+Math.random()*.8);
+}
+
+const paths=[
+  {name:"Meadow Run",color:green,width:4.8,pts:[[-42,34],[-39,29],[-34,23],[-30,16],[-24,9],[-18,3],[-12,-4],[-6,-11],[0,-19],[8,-24]]},
+  {name:"Ridge Runner",color:red,width:4.6,pts:[[27,31],[25,26],[22,21],[18,15],[15,9],[12,2],[9,-6],[7,-14],[8,-22],[13,-27]]},
+  {name:"Glacier Way",color:blue,width:5.0,pts:[[-1,38],[1,33],[4,28],[7,22],[10,16],[14,10],[18,4],[21,-3],[23,-10],[24,-18]]},
+  {name:"Black Couloir",color:black,width:3.8,pts:[[42,29],[38,24],[35,18],[32,12],[29,6],[27,0],[25,-7],[23,-14]]},
+  {name:"Village Link",color:blue,width:4.0,pts:[[-31,-4],[-26,-8],[-20,-12],[-14,-16],[-7,-20],[1,-23],[9,-25],[17,-25]]}
+];
+
+function ribbon(path){
+  const verts=[],inds=[],side=[];
+  for(let i=0;i<path.pts.length;i++){
+    const [x,z]=path.pts[i],prev=path.pts[Math.max(0,i-1)],next=path.pts[Math.min(path.pts.length-1,i+1)];
+    const dx=next[0]-prev[0],dz=next[1]-prev[1],len=Math.hypot(dx,dz)||1;
+    const nx=-dz/len,nz=dx/len,w=path.width/2;
+    const left=[x+nx*w,z+nz*w],right=[x-nx*w,z-nz*w];
+    verts.push(left[0],height(left[0],left[1])+.28,left[1],right[0],height(right[0],right[1])+.28,right[1]);
+    side.push([left,right]);
+  }
+  for(let i=0;i<path.pts.length-1;i++){const q=i*2;inds.push(q,q+1,q+2,q+1,q+3,q+2);}
+  const e=meshEntity(path.name+" 3D piste",verts,inds,path.color);
+  // Raised snow berms make the run read as a real cut into the mountain.
+  side.forEach((s,i)=>{
+    if(i%2!==0)return;
+    s.forEach(([x,z])=>{const y=height(x,z)+.38; cone(path.name+" piste berm",[.24,.45,.24],[x,y,z],snowBright);});
+  });
+  // Boundary poles and piste markers.
+  path.pts.forEach(([x,z],i)=>{
+    if(i%2===0){
+      const dx=(path.pts[Math.min(path.pts.length-1,i+1)][0]-path.pts[Math.max(0,i-1)][0]);
+      const dz=(path.pts[Math.min(path.pts.length-1,i+1)][1]-path.pts[Math.max(0,i-1)][1]);
+      const l=Math.hypot(dx,dz)||1,nx=-dz/l,nz=dx/l;
+      for(const sign of[-1,1]){
+        const px=x+nx*(path.width*.58)*sign,pz=z+nz*(path.width*.58)*sign;
+        cyl(path.name+" snow pole",[.045,1.25,.045],[px,height(px,pz)+.62,pz],yellow);
+      }
+    }
+  });
+  return e;
+}
+paths.forEach(ribbon);
+
+function signAt(text,x,z,color){
+  const y=height(x,z)+1.25,e=new pc.Entity(text);
+  e.setLocalPosition(x,y,z);app.root.addChild(e);
+  cyl("sign post",[.06,1.3,.06],[0,-.65,0],steel,e);
+  box("sign board",[1.35,.58,.10],[0,.05,0],color,e);
+  return e;
+}
+signAt("MEADOW",-18,3,green);
+signAt("RIDGE",12,2,red);
+signAt("GLACIER",18,4,blue);
+signAt("COULOIR",29,5,black);
+
+function chalet(n,x,z,s=1){
+  const y=height(x,z),e=new pc.Entity(n);e.setLocalPosition(x,y,z);e.setLocalScale(s,s,s);app.root.addChild(e);
+  box("chalet walls",[8,3.9,6],[0,2,0],timber,e);
+  // Pitched roof: two long rotated roof planes.
+  const r1=box("pitched roof",[4.9,.55,7.2],[-2.05,4.35,0],roof,e);r1.setLocalEulerAngles(0,0,-29);
+  const r2=box("pitched roof",[4.9,.55,7.2],[2.05,4.35,0],roof,e);r2.setLocalEulerAngles(0,0,29);
+  const rs1=box("roof snow",[4.7,.18,7.0],[-2.0,4.72,0],roofSnow,e);rs1.setLocalEulerAngles(0,0,-29);
+  const rs2=box("roof snow",[4.7,.18,7.0],[2.0,4.72,0],roofSnow,e);rs2.setLocalEulerAngles(0,0,29);
+  for(const sx of[-2.7,0,2.7]){
+    box("window",[1.45,1.1,.12],[sx,2.35,3.04],glass,e);
+    box("window light",[1.15,.12,.13],[sx,2.35,3.11],warm,e);
+  }
+  box("door",[1.15,2.1,.16],[0,1.05,3.08],roof,e);
+  box("balcony",[3.4,.16,1.0],[0,2.75,3.48],trunk,e);
+  for(const sx of[-1.45,1.45])cyl("balcony rail",[.08,1.0,.08],[sx,3.25,3.48],steel,e);
+  cyl("chimney",[.55,1.25,.55],[2.3,5.0,1.0],roof,e);
+}
+chalet("Summit Lodge",-5,-24,1.35);
+chalet("Piste House",18,-16,.9);
+chalet("Mountain Hotel",-27,-14,1.25);
+
+function station(n,x,z,type="chair"){
+  const y=height(x,z),e=new pc.Entity(n);e.setLocalPosition(x,y,z);app.root.addChild(e);
+  box("station body",[6,2.8,4.5],[0,1.4,0],steel,e);
+  const r1=box("station roof",[3.6,.5,5.6],[-1.5,3.05,0],roof,e);r1.setLocalEulerAngles(0,0,-22);
+  const r2=box("station roof",[3.6,.5,5.6],[1.5,3.05,0],roof,e);r2.setLocalEulerAngles(0,0,22);
+  box("station glass",[4.4,1.25,.12],[0,1.55,2.28],glass,e);
+  box("station platform",[7,.25,1.3],[0,.25,0],snowBright,e);
+  if(type==="gondola")box("gondola sign",[2.3,.55,.12],[0,2.35,2.4],gondola,e);
+  return e;
+}
+
+function makeLift(n,a,b,count,type="chair"){
+  const root=new pc.Entity(n);app.root.addChild(root);
+  const [ax,az]=a,[bx,bz]=b,dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz)||1;
+  const ay=height(ax,az)+3.1,by=height(bx,bz)+3.1;
+  const ang=Math.atan2(dx,dz)*180/Math.PI;
+  station(n+" base",ax,az,type);station(n+" summit",bx,bz,type);
+  for(let i=1;i<8;i++){
+    const t=i/8,x=ax+dx*t,z=az+dz*t,y=height(x,z)+2.6;
+    const tower=new pc.Entity(n+" tower");tower.setLocalPosition(x,y,z);root.addChild(tower);
+    cyl("tower leg",[.24,5,.24],[0,-2.5,0],steel,tower);
+    const cross=box("tower crossarm",[3.2,.2,.35],[0,0,0],steel,tower);cross.setLocalEulerAngles(0,ang,0);
+    for(const sx of[-1,1])sphere("sheave",[.28,.28,.28],[sx*1.35,-.18,0],cable,tower);
+  }
+  const rope=box("cable",[.065,.065,len],[(ax+bx)/2,(ay+by)/2,(az+bz)/2],cable,root);
+  rope.setLocalEulerAngles(0,ang,Math.atan2(by-ay,len)*180/Math.PI);
+  const carriers=[];
+  for(let i=0;i<count;i++){
+    const e=new pc.Entity(n+" carrier "+i);root.addChild(e);
+    e._phase=i/count;e._a=[ax,ay,az];e._b=[bx,by,bz];e._type=type;
+    if(type==="gondola"){
+      box("cab",[1.25,1.05,.9],[0,-.2,0],gondola,e);
+      box("cab glass",[1.0,.65,.08],[0,-.15,.47],glass,e);
+      box("hanger",[.07,1.35,.07],[0,.82,0],steel,e);
+    }else{
+      box("seat",[1.3,.16,.48],[0,-.58,0],chair,e);
+      box("back",[1.3,.7,.11],[0,-.18,0],chair,e);
+      box("hanger",[.07,1.5,.07],[0,.6,0],steel,e);
+    }
+    carriers.push(e);
+  }
+  return carriers;
+}
+const lift1=makeLift("Eagle Express",[-5,-22],[-38,31],11,"chair");
+const lift2=makeLift("Glacier Chair",[18,-15],[1,38],10,"chair");
+const lift3=makeLift("Ridge Gondola",[28,-8],[44,29],8,"gondola");
+
 const guests=[];
-function chooseRoute(g){const r=(g._route+1+Math.floor(Math.random()*2))%3;g._route=r;g._path=Math.random();}
-function skier(i,x,z,type){const y=height(x,z)+.55,e=new pc.Entity(type+" "+i);e.setLocalPosition(x,y,z);app.root.addChild(e);sphere("helmet",[.28,.28,.28],[0,1.55,0],i%3===0?red:steel,e);sphere("head",[.23,.23,.23],[0,1.35,0],skin,e);box("body",[.38,.65,.28],[0,.9,0],i%2?jacket:red,e);box("legL",[.13,.55,.13],[-.12,.4,0],pants,e);box("legR",[.13,.55,.13],[.12,.4,0],pants,e);box("skiL",[.07,.05,.95],[-.17,.12,0],snow2,e);box("skiR",[.07,.05,.95],[.17,.12,0],snow2,e);if(type==="snowboarder")box("board",[.75,.06,.25],[0,.1,0],black,e);e._path=Math.random();e._route=Math.random()<.5?0:1;e._speed=.9+Math.random()*.8;guests.push(e)}
-for(let i=0;i<36;i++){const r=i%3, t=(i/36+r*.31)%1, p=samplePath(paths[r],t); skier(i,p[0],p[1],i%6===0?"snowboarder":"skier"); guests[guests.length-1]._route=r; guests[guests.length-1]._path=t;}
+function samplePath(path,t){
+  const f=t*(path.pts.length-1),i=Math.min(path.pts.length-2,Math.floor(f)),q=f-i;
+  return [path.pts[i][0]+(path.pts[i+1][0]-path.pts[i][0])*q,path.pts[i][1]+(path.pts[i+1][1]-path.pts[i][1])*q];
+}
+function makeSkier(i,pathIndex,t,type){
+  const path=paths[pathIndex],p=samplePath(path,t),y=height(p[0],p[1])+.62;
+  const e=new pc.Entity((type==="snowboarder"?"Snowboarder ":"Skier ")+i);
+  e.setLocalPosition(p[0],y,p[1]);app.root.addChild(e);
+  const jm=i%3===0?jacket2:i%3===1?jacket:jacket3;
+  sphere("helmet",[.27,.27,.27],[0,1.58,0],i%2?cable:yellow,e);
+  sphere("head",[.22,.22,.22],[0,1.38,0],skin,e);
+  box("torso",[.42,.68,.30],[0,.95,0],jm,e);
+  const armL=box("arm",[.13,.55,.13],[-.30,1.02,0],jm,e);
+  const armR=box("arm",[.13,.55,.13],[.30,1.02,0],jm,e);
+  box("leg",[.14,.55,.14],[-.13,.42,0],pants,e);box("leg",[.14,.55,.14],[.13,.42,0],pants,e);
+  if(type==="snowboarder"){
+    box("board",[.95,.07,.20],[0,.13,0],board,e);
+  }else{
+    box("ski",[.055,.045,1.12],[-.18,.12,0],snowBright,e);
+    box("ski",[.055,.045,1.12],[.18,.12,0],snowBright,e);
+    cyl("pole",[.025,.7,.025],[-.34,.62,0],steel,e);cyl("pole",[.025,.7,.025],[.34,.62,0],steel,e);
+  }
+  e._route=pathIndex;e._path=t;e._speed=.025+Math.random()*.035;e._phase=Math.random()*6;
+  e._turn=0;guests.push(e);
+}
+for(let i=0;i<42;i++){
+  const route=i%paths.length;
+  makeSkier(i,route,(i*0.173+Math.random()*.22)%1,i%7===0?"snowboarder":"skier");
+}
+
+function chooseRoute(g){
+  const candidates=[0,1,2,3,4].filter(x=>x!==g._route);
+  g._route=candidates[Math.floor(Math.random()*candidates.length)];
+  g._path=Math.random()*.10;
+  g._speed=.022+Math.random()*.04;
+}
 let cash=250000,paused=false,weather=0;
-function samplePath(path,t){const f=t*(path.length-1),i=Math.min(path.length-2,Math.floor(f)),q=f-i;return[path[i][0]+(path[i+1][0]-path[i][0])*q,path[i][1]+(path[i+1][1]-path[i][1])*q]}
-app.on("update",dt=>{if(paused)return;guests.forEach((g,i)=>{g._path+=dt*g._speed*.018;if(g._path>=1){chooseRoute(g)} const p=samplePath(paths[g._route],g._path),p2=samplePath(paths[g._route],Math.min(1,g._path+.01));g.setLocalPosition(p[0],height(p[0],p[1])+.55,p[1]);g.setLocalEulerAngles(0,Math.atan2(p2[0]-p[0],p2[1]-p[1])*180/Math.PI,0)});lift1.concat(lift2,lift3).forEach(c=>{const t=(c._phase+performance.now()/1000*.035)%1;c.setPosition(pc.math.lerp(c._a[0],c._b[0],t),pc.math.lerp(c._a[1],c._b[1],t),pc.math.lerp(c._a[2],c._b[2],t))});document.getElementById("guests").textContent=String(26+Math.floor((performance.now()/1000)%140));document.getElementById("cash").textContent=Math.floor(cash).toLocaleString()});
-let tool="select";document.querySelectorAll(".tool").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".tool").forEach(x=>x.classList.remove("active"));b.classList.add("active");tool=b.dataset.tool;toast(tool==="select"?"Select and inspect your resort":"Build mode: "+b.textContent.trim())}));
-function toast(t){const e=document.getElementById("toast");e.textContent=t;e.classList.add("show");clearTimeout(window.__toast);window.__toast=setTimeout(()=>e.classList.remove("show"),1600)}
+
+app.on("update",dt=>{
+  if(paused)return;
+  const now=performance.now()/1000;
+  guests.forEach(g=>{
+    g._path+=dt*g._speed;
+    if(g._path>=1)chooseRoute(g);
+    const path=paths[g._route],p=samplePath(path,g._path),p2=samplePath(path,Math.min(.999,g._path+.012));
+    const turn=Math.atan2(p2[0]-p[0],p2[1]-p[1])*180/Math.PI;
+    g.setLocalPosition(p[0],height(p[0],p[1])+.62,p[1]);
+    g.setLocalEulerAngles(0,turn,Math.sin(now*4+g._phase)*4);
+  });
+  [...lift1,...lift2,...lift3].forEach(c=>{
+    const cycle=(c._phase+now*.055)%2;
+    const t=cycle<=1?cycle:2-cycle;
+    c.setPosition(
+      pc.math.lerp(c._a[0],c._b[0],t),
+      pc.math.lerp(c._a[1],c._b[1],t),
+      pc.math.lerp(c._a[2],c._b[2],t)
+    );
+  });
+  document.getElementById("guests").textContent=String(80+Math.floor((now*2)%90));
+  document.getElementById("cash").textContent=Math.floor(cash).toLocaleString();
+});
+
+let tool="select";
+document.querySelectorAll(".tool").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".tool").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");tool=b.dataset.tool;
+  toast(tool==="select"?"Select and inspect your resort":"Build mode: "+b.textContent.trim());
+}));
+function toast(t){
+  const e=document.getElementById("toast");e.textContent=t;e.classList.add("show");
+  clearTimeout(window.__toast);window.__toast=setTimeout(()=>e.classList.remove("show"),1600);
+}
 document.getElementById("pauseBtn").onclick=()=>{paused=!paused;document.getElementById("pauseBtn").textContent=paused?"▶":"Ⅱ";toast(paused?"Game paused":"Game resumed")};
-document.getElementById("weatherBtn").onclick=()=>{weather=(weather+1)%3;const n=["Clear","Snowfall","Storm"];document.getElementById("weather").textContent=n[weather];toast(n[weather]+" conditions")};
+document.getElementById("weatherBtn").onclick=()=>{
+  weather=(weather+1)%3;const n=["Clear","Snowfall","Storm"];
+  document.getElementById("weather").textContent=n[weather];toast(n[weather]+" conditions");
+};
 document.getElementById("resetBtn").onclick=()=>{cash=250000;toast("New season started")};
-const camera=new pc.Entity("Camera");camera.addComponent("camera",{clearColor:new pc.Color(.52,.70,.84),fov:48});app.root.addChild(camera);let yaw=-28,pitch=38,distance=118,target=new pc.Vec3(0,14,2);function updateCamera(){const yr=yaw*Math.PI/180,pr=pitch*Math.PI/180;camera.setPosition(target.x+Math.sin(yr)*Math.cos(pr)*distance,target.y+Math.sin(pr)*distance,target.z+Math.cos(yr)*Math.cos(pr)*distance);camera.lookAt(target)}updateCamera();
-const pointers=new Map();let lastDist=0;canvas.addEventListener("pointerdown",e=>{canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,[e.clientX,e.clientY])});canvas.addEventListener("pointermove",e=>{if(!pointers.has(e.pointerId))return;const old=pointers.get(e.pointerId);pointers.set(e.pointerId,[e.clientX,e.clientY]);if(pointers.size===1){yaw-=(e.clientX-old[0])*.22;pitch=Math.max(18,Math.min(78,pitch+(e.clientY-old[1])*.18));updateCamera()}else if(pointers.size===2){const a=[...pointers.values()],d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(lastDist)distance=Math.max(42,Math.min(135,distance-(d-lastDist)*.35));lastDist=d;updateCamera()}});canvas.addEventListener("pointerup",e=>{pointers.delete(e.pointerId);lastDist=0});canvas.addEventListener("wheel",e=>{distance=Math.max(42,Math.min(135,distance+e.deltaY*.06));updateCamera()},{passive:true});window.addEventListener("resize",()=>app.resizeCanvas(canvas.clientWidth,canvas.clientHeight));
-setTimeout(()=>{document.getElementById("loading").style.opacity="0";setTimeout(()=>document.getElementById("loading").remove(),600);toast("Welcome to Summit Valley")},1400);
+
+const camera=new pc.Entity("Camera");
+camera.addComponent("camera",{clearColor:new pc.Color(.60,.76,.88),fov:48});
+app.root.addChild(camera);
+let yaw=-31,pitch=34,distance=126,target=new pc.Vec3(0,15,3);
+function updateCamera(){
+  const yr=yaw*Math.PI/180,pr=pitch*Math.PI/180;
+  camera.setPosition(target.x+Math.sin(yr)*Math.cos(pr)*distance,target.y+Math.sin(pr)*distance,target.z+Math.cos(yr)*Math.cos(pr)*distance);
+  camera.lookAt(target);
+}
+updateCamera();
+
+const pointers=new Map();let lastDist=0;
+canvas.addEventListener("pointerdown",e=>{canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,[e.clientX,e.clientY])});
+canvas.addEventListener("pointermove",e=>{
+  if(!pointers.has(e.pointerId))return;
+  const old=pointers.get(e.pointerId);pointers.set(e.pointerId,[e.clientX,e.clientY]);
+  if(pointers.size===1){yaw-=(e.clientX-old[0])*.22;pitch=Math.max(15,Math.min(75,pitch+(e.clientY-old[1])*.18));updateCamera()}
+  else if(pointers.size===2){
+    const a=[...pointers.values()],d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);
+    if(lastDist)distance=Math.max(48,Math.min(150,distance-(d-lastDist)*.35));
+    lastDist=d;updateCamera();
+  }
+});
+canvas.addEventListener("pointerup",e=>{pointers.delete(e.pointerId);lastDist=0});
+canvas.addEventListener("wheel",e=>{distance=Math.max(48,Math.min(150,distance+e.deltaY*.06));updateCamera()},{passive:true});
+window.addEventListener("resize",()=>app.resizeCanvas(canvas.clientWidth,canvas.clientHeight));
+
+setTimeout(()=>{
+  document.getElementById("loading").style.opacity="0";
+  setTimeout(()=>document.getElementById("loading").remove(),600);
+  toast("Summit Valley — 3D vertical slice");
+},1400);
