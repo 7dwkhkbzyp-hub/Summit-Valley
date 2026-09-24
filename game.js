@@ -667,5 +667,175 @@ canvas.addEventListener("pointerdown",e=>{
 canvas.addEventListener("pointermove",e=>{if(buildMode){const p=worldPointFromScreen(e.clientX,e.clientY);const buildingIds=["hotel","chalet","lodge","restaurant","bar","cafe","skiShop","rental","toilet","ticket","parking"];if(buildSelection&&buildingIds.includes(buildSelection.id)){if(!ghost)ghost=createDetailedBuilding(buildSelection.id,p.x,p.z,true);else ghost.setPosition(p.x,height(p.x,p.z),p.z)}else if(draggingBuild&&buildSelection&&(buildSelection.id.toLowerCase().includes("piste")||["chair","gondola","tbar","magic"].includes(buildSelection.id))){if(buildStart&&!ghost){ghost=new pc.Entity("Route preview");app.root.addChild(ghost)}}return}if(!pointers.has(e.pointerId))return;const old=pointers.get(e.pointerId);pointers.set(e.pointerId,[e.clientX,e.clientY]);if(pointers.size===1){yaw-=(e.clientX-old[0])*.22;pitch=Math.max(14,Math.min(72,pitch+(e.clientY-old[1])*.18));updateCamera()}else if(pointers.size===2){const a=[...pointers.values()],d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(lastDist)distance=Math.max(48,Math.min(160,distance-(d-lastDist)*.35));lastDist=d;updateCamera()}});
 canvas.addEventListener("pointerup",e=>{if(buildMode){e.preventDefault();draggingBuild=false;const p=worldPointFromScreen(e.clientX,e.clientY);if(buildSelection&&["hotel","chalet","lodge","restaurant","bar","cafe","skiShop","rental","toilet","ticket","parking"].includes(buildSelection.id))placeBuilding(p);else if(buildSelection&&(buildSelection.id.toLowerCase().includes("piste")||["chair","gondola","tbar","magic"].includes(buildSelection.id)))beginRoute(buildSelection.id,p);return}pointers.delete(e.pointerId);lastDist=0});
 canvas.addEventListener("wheel",e=>{distance=Math.max(48,Math.min(160,distance+e.deltaY*.06));updateCamera()},{passive:true});
+
+
+/* ============================================================
+   SUMMIT VALLEY — VISUAL OVERHAUL / ALPINE CINEMATIC LAYER
+   This pass is deliberately visual-first: richer silhouettes,
+   atmospheric depth, village density, snow forms, signage,
+   lighting accents and a more convincing alpine scale.
+   ============================================================ */
+const visualRoot=new pc.Entity("VISUAL OVERHAUL");
+app.root.addChild(visualRoot);
+
+function visualMesh(name, positions, indices, material){
+ const mesh=new pc.Mesh(app.graphicsDevice);
+ mesh.setPositions(positions); mesh.setIndices(indices); mesh.update(pc.PRIMITIVE_TRIANGLES);
+ const e=new pc.Entity(name);
+ e.addComponent("render",{type:"asset",castShadows:true,receiveShadows:true});
+ e.render.meshInstances=[new pc.MeshInstance(mesh,material)];
+ visualRoot.addChild(e);
+ return e;
+}
+
+/* Snow shelves: broad, irregular patches that sit over the terrain and
+   make the mountain read as layered snow rather than a single smooth mesh. */
+function snowShelf(cx,cz,w,d,rot=0,raise=.12){
+ const cr=Math.cos(rot),sr=Math.sin(rot);
+ const raw=[
+  [-.50,-.38],[-.12,-.50],[.30,-.42],[.50,-.08],
+  [.37,.34],[.02,.48],[-.38,.32],[-.54,.02]
+ ];
+ const p=raw.map(([u,v])=>{
+   const x=cx+(u*w)*cr-(v*d)*sr,z=cz+(u*w)*sr+(v*d)*cr;
+   return [x,height(x,z)+raise,z];
+ });
+ const verts=[]; p.forEach(q=>verts.push(q[0],q[1],q[2]));
+ const inds=[0,1,2,0,2,3,0,3,6,3,4,5,3,5,6,6,5,7];
+ visualMesh("Wind-loaded snow shelf",verts,inds,snowBright);
+}
+[
+ [-52,28,18,7,-.15],[-38,34,16,6,.08],[-22,39,19,7,-.12],
+ [-3,43,18,6,.22],[15,37,17,7,-.18],[33,29,19,7,.10],
+ [48,19,15,7,-.22],[-59,15,14,8,.08],[-12,28,13,6,.18],
+ [20,22,15,6,-.15],[40,9,13,7,.14]
+].forEach(v=>snowShelf(...v));
+
+/* Exposed granite ribs on steep faces. */
+function rockRib(cx,cz,w,d,rot=0){
+ const cr=Math.cos(rot),sr=Math.sin(rot);
+ const verts=[]; const rows=3,cols=5;
+ for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){
+   const u=i/(cols-1)-.5,v=j/(rows-1)-.5;
+   const x=cx+u*w*cr-v*d*sr,z=cz+u*w*sr+v*d*cr;
+   const y=height(x,z)+.03-(Math.abs(u)*.15)+(j===1?.15:0);
+   verts.push(x,y,z);
+ }
+ const inds=[];for(let j=0;j<rows-1;j++)for(let i=0;i<cols-1;i++){
+   const q=j*cols+i;inds.push(q,q+1,q+cols,q+1,q+cols+1,q+cols);
+ }
+ visualMesh("Layered granite face",verts,inds,rockLight);
+}
+[
+ [-43,29,10,4,.2],[-30,35,12,4,-.1],[-7,39,9,4,.15],
+ [19,31,11,4,-.2],[42,21,10,5,.1],[-56,18,9,4,-.15]
+].forEach(v=>rockRib(...v));
+
+/* A denser mid-mountain forest belt, using the existing detailed tree
+   silhouette but avoiding piste corridors. */
+for(let i=0;i<48;i++){
+ const x=-73+Math.random()*146,z=-45+Math.random()*78;
+ const y=height(x,z);
+ let nearPiste=false;
+ paths.forEach(p=>p.pts.forEach(q=>{if(Math.hypot(x-q[0],z-q[1])<p.width*1.35)nearPiste=true;}));
+ if(y>8&&y<29&&!nearPiste) tree(x,z,.52+Math.random()*.72,.62+Math.random()*.38);
+}
+
+/* Alpine clouds: soft layered silhouettes in the far sky. */
+const visualClouds=[];
+function cloud(x,y,z,s=1){
+ const e=new pc.Entity("Alpine cloud");
+ e.setPosition(x,y,z);e.setLocalScale(s,s,s);visualRoot.addChild(e);
+ [
+  [-2.3,0,0,2.4],[0,0.45,.1,3.0],[2.4,.05,.2,2.0],
+  [.8,-.18,.75,1.8],[-.9,-.15,.65,1.55]
+ ].forEach(([px,py,pz,sc])=>{
+   sphere("cloud puff",[sc,sc*.62,sc*.72],[px,py,pz],snowBright,e);
+ });
+ visualClouds.push({e,base:x,speed:.018+Math.random()*.012});
+}
+cloud(-70,67,-92,2.7);cloud(12,72,-115,3.3);cloud(72,62,-105,2.4);
+cloud(-5,77,-145,4.1);cloud(88,70,-155,2.8);
+
+/* Village detail pass: street lamps, benches, stacked logs, flags and
+   little service props make the settlement feel inhabited. */
+function streetLamp(x,z,rot=0){
+ const y=height(x,z),e=new pc.Entity("Village street lamp");
+ e.setPosition(x,y,z);e.setEulerAngles(0,rot,0);visualRoot.addChild(e);
+ cyl("lamp post",[.07,2.8,.07],[0,1.4,0],steel,e);
+ box("lamp arm",[.75,.07,.07],[.32,2.68,0],steel,e);
+ sphere("warm lamp",[.16,.16,.16],[.67,2.58,0],warm,e);
+ const glow=new pc.Entity("lamp glow");
+ glow.setPosition(.67,2.58,0);e.addChild(glow);
+ glow.addComponent("light",{type:"omni",color:new pc.Color(1,.48,.16),intensity:.45,range:7,castShadows:false});
+}
+[
+ [-43,-20,20],[-31,-24,-10],[-20,-26,12],[-8,-29,0],[5,-30,-8],
+ [17,-28,15],[28,-24,-8],[38,-19,10],[-20,-21,-6]
+].forEach(v=>streetLamp(...v));
+
+function villageFlag(x,z,material,rot=0){
+ const y=height(x,z),e=new pc.Entity("Alpine flag");
+ e.setPosition(x,y,z);e.setEulerAngles(0,rot,0);visualRoot.addChild(e);
+ cyl("flag pole",[.035,3.0,.035],[0,1.5,0],steel,e);
+ box("flag",[.95,.48,.035],[.48,2.35,0],material,e);
+}
+villageFlag(-12,-30,red,0.2);villageFlag(23,-28,blue,-.3);villageFlag(-37,-21,green,.1);
+
+/* Snow-covered roadside timber piles and benches. */
+function logPile(x,z,rot=0){
+ const y=height(x,z),e=new pc.Entity("Timber log pile");
+ e.setPosition(x,y+.35,z);e.setEulerAngles(0,rot,0);visualRoot.addChild(e);
+ for(let i=0;i<4;i++){
+   const q=cyl("cut log",[.20,1.45,.20],[0,.25+i*.18,(i%2)*.28],trunk,e);
+   q.setLocalEulerAngles(0,90,90);
+ }
+ box("snow on logs",[1.55,.12,.62],[0,.92,.12],snowBright,e);
+}
+logPile(-46,-12,.2);logPile(43,-10,-.25);logPile(-4,-23,.4);
+
+/* Piste furniture: avalanche signs, boundary poles, padded lift towers. */
+function pistePole(x,z,matl=yellow){
+ const y=height(x,z),e=new pc.Entity("Piste boundary pole");
+ e.setPosition(x,y,z);visualRoot.addChild(e);
+ cyl("pole",[.045,1.5,.045],[0,.75,0],matl,e);
+ sphere("pole cap",[.10,.10,.10],[0,1.52,0],matl,e);
+}
+[
+ [-41,30],[-35,25],[-25,20],[-15,13],[-6,7],[6,-3],[15,-11],
+ [23,16],[28,11],[33,6],[38,0],[42,-7]
+].forEach(v=>pistePole(...v));
+
+function paddedTower(x,z,rot=0){
+ const y=height(x,z),e=new pc.Entity("Padded lift tower");
+ e.setPosition(x,y,z);e.setEulerAngles(0,rot,0);visualRoot.addChild(e);
+ box("tower padding",[.75,2.3,.28],[0,1.15,0],red,e);
+ box("padding white band",[.78,.28,.30],[0,1.55,0],snowBright,e);
+}
+paddedTower(-17,1,0.2);paddedTower(5,8,-.15);paddedTower(27,2,.1);paddedTower(38,17,-.2);
+
+/* Make the key directional light use cascaded shadows when supported.
+   PlayCanvas documents cascades as a way to keep near-camera shadow detail. */
+try{
+ sun.light.numCascades=3;
+ sun.light.cascadeDistribution=.72;
+ sun.light.cascadeBlend=.12;
+ sun.light.shadowIntensity=.82;
+}catch(_){}
+
+/* More cinematic atmospheric depth without requiring a heavy post-process pass. */
+app.scene.fog.start=82;
+app.scene.fog.end=235;
+app.scene.fog.color=new pc.Color(.60,.73,.86);
+app.scene.exposure=1.18;
+
+/* Animate clouds and let the mountain breathe visually through drifting snow. */
+app.on("update",dt=>{
+ visualClouds.forEach(c=>{
+   c.e.translateLocal(dt*c.speed,0,0);
+   if(c.e.getPosition().x>150)c.e.setPosition(-150,c.e.getPosition().y,c.e.getPosition().z);
+ });
+});
+
 window.addEventListener("resize",()=>app.resizeCanvas(canvas.clientWidth,canvas.clientHeight));
 setTimeout(()=>{bootFinished=true;clearTimeout(bootWatchdog);const loading=document.getElementById("loading");if(loading){loading.style.opacity="0";setTimeout(()=>loading.remove(),450)}toast("Summit Valley — Alpine resort ready")},900);
