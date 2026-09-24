@@ -7,7 +7,7 @@ app.scene.ambientLight=new pc.Color(.30,.39,.52);app.scene.fog.type=pc.FOG_LINEA
 const sun=new pc.Entity("Alpine Sun");sun.addComponent("light",{type:"directional",color:new pc.Color(1,.94,.82),intensity:3,castShadows:true,shadowDistance:220,shadowResolution:2048});sun.setEulerAngles(43,-34,0);app.root.addChild(sun);app.scene.exposure=1.12;app.start();
 
 const mats={};function mat(n,c,r=.8,m=0,em=0){const x=new pc.StandardMaterial();x.diffuse=new pc.Color(c[0],c[1],c[2]);x.roughness=r;x.metalness=m;x.useMetalness=true;x.name=n;if(em){x.emissive=new pc.Color(c[0]*em,c[1]*em,c[2]*em);x.emissiveIntensity=em}x.update();mats[n]=x;return x}
-const snow=mat("Powder snow",[.82,.89,.96],.98),snowBright=mat("Sunlit snow",[.98,.995,1],.92),snowBlue=mat("Blue shadow snow",[.58,.70,.84],1),snowGrey=mat("Packed snow",[.70,.79,.88],.98),rock=mat("Dark granite",[.18,.20,.22],.96),rockLight=mat("Sunlit granite",[.36,.38,.39],.9),rockDark=mat("Deep rock",[.105,.12,.13],1),pine=mat("Fir forest",[.018,.095,.058],.98),pine2=mat("Snowy fir",[.10,.23,.16],.94),pineSnow=mat("Heavy snow fir",[.63,.72,.77],.96),trunk=mat("Timber",[.18,.09,.045],.9),timber=mat("Chalet timber",[.30,.15,.07],.82),roof=mat("Dark roof",[.055,.045,.043],.7),roofSnow=mat("Roof snow",[.88,.93,.97],.96),glass=mat("Warm glass",[.045,.18,.24],.10,.25,.35),warm=mat("Interior light",[1,.45,.08],.16,0,.9),steel=mat("Lift steel",[.29,.33,.37],.32,.85),cable=mat("Lift cable",[.025,.03,.035],.52,.8),chair=mat("Chair red",[.70,.045,.035],.4,.3),gondola=mat("Gondola blue",[.055,.23,.31],.15,.55),green=mat("Green piste",[.08,.52,.16],.78),blue=mat("Blue piste",[.045,.27,.76],.78),red=mat("Red piste",[.70,.055,.035],.72),black=mat("Black piste",[.035,.038,.045],.65),yellow=mat("Piste marker",[1,.65,.05],.45),jacket=mat("Skier blue",[.06,.22,.72],.66),jacket2=mat("Skier red",[.72,.06,.045],.66),jacket3=mat("Skier green",[.04,.38,.20],.66),jacket4=mat("Skier orange",[.90,.34,.04],.66),pants=mat("Skier dark",[.025,.035,.05],.72),skin=mat("Skin",[.70,.43,.27],.82),board=mat("Snowboard",[.07,.08,.10],.45,.4);
+const snow=mat("Powder snow",[.82,.89,.96],.98),snowBright=mat("Sunlit snow",[.98,.995,1],.92),snowBlue=mat("Blue shadow snow",[.58,.70,.84],1),snowGrey=mat("Packed snow",[.70,.79,.88],.98),rock=mat("Dark granite",[.18,.20,.22],.96),rockLight=mat("Sunlit granite",[.36,.38,.39],.9),rockDark=mat("Deep rock",[.105,.12,.13],1),pine=mat("Fir forest",[.018,.095,.058],.98),pine2=mat("Snowy fir",[.10,.23,.16],.94),pineSnow=mat("Heavy snow fir",[.63,.72,.77],.96),trunk=mat("Timber",[.18,.09,.045],.9),timber=mat("Chalet timber",[.30,.15,.07],.82),roof=mat("Dark roof",[.055,.045,.043],.7),roofSnow=mat("Roof snow",[.88,.93,.97],.96),glass=mat("Warm glass",[.045,.18,.24],.10,.25,.35),warm=mat("Interior light",[1,.45,.08],.16,0,.9),steel=mat("Lift steel",[.29,.33,.37],.32,.85),cable=mat("Lift cable",[.025,.03,.035],.52,.8),chair=mat("Chair red",[.70,.045,.035],.4,.3),gondola=mat("Gondola blue",[.055,.23,.31],.15,.55),green=mat("Green piste",[.08,.52,.16],.78),blue=mat("Blue piste",[.045,.27,.76],.78),red=mat("Red piste",[.70,.055,.035],.72),black=mat("Black piste",[.035,.038,.045],.65),yellow=mat("Piste marker",[1,.65,.05],.45),jacket=mat("Skier blue",[.06,.22,.72],.66),jacket2=mat("Skier red",[.72,.06,.045],.66),jacket3=mat("Skier green",[.04,.38,.20],.66),jacket4=mat("Skier orange",[.90,.34,.04],.66),pants=mat("Skier dark",[.025,.035,.05],.72),skin=mat("Skin",[.70,.43,.27],.82),board=mat("Snowboard",[.07,.08,.10],.45,.4),goggle=mat("Goggles",[.03,.12,.18],.08,.55,.22),boot=mat("Boots",[.035,.045,.055],.48,.25),pack=mat("Backpack",[.035,.055,.075],.7),glove=mat("Gloves",[.055,.065,.075],.72),terrainTint=mat("Terrain detail",[.92,.96,1],.98);
 
 function entity(n,p,s,pos,m,parent=app.root){const e=new pc.Entity(n);e.addComponent("render",{type:p});e.setLocalScale(s[0],s[1],s[2]);e.setLocalPosition(pos[0],pos[1],pos[2]);e.render.material=m;parent.addChild(e);return e}
 const box=(n,s,p,m,q)=>entity(n,"box",s,p,m,q),sphere=(n,s,p,m,q)=>entity(n,"sphere",s,p,m,q),cyl=(n,s,p,m,q)=>entity(n,"cylinder",s,p,m,q),cone=(n,s,p,m,q)=>entity(n,"cone",s,p,m,q);
@@ -24,22 +24,69 @@ function segmentDistance(x,z,a,b){const vx=b[0]-a[0],vz=b[1]-a[1],wx=x-a[0],wz=z
 function pisteCut(x,z){let cut=0;paths.forEach(p=>{for(let i=0;i<p.pts.length-1;i++){const d=segmentDistance(x,z,p.pts[i],p.pts[i+1]);if(d<p.width*1.15)cut=Math.max(cut,(1-d/(p.width*1.15))*1.65)}});return cut}
 function height(x,z){return Math.max(.5,rawHeight(x,z)-pisteCut(x,z))}
 
-function meshEntity(name,positions,indices,material,normals){const mesh=new pc.Mesh(app.graphicsDevice);mesh.setPositions(positions);if(normals)mesh.setNormals(normals);mesh.setIndices(indices);mesh.update(pc.PRIMITIVE_TRIANGLES);const e=new pc.Entity(name);e.addComponent("render",{type:"asset"});e.render.meshInstances=[new pc.MeshInstance(mesh,material)];app.root.addChild(e);return e}
+function meshEntity(name,positions,indices,material,normals,colors){const mesh=new pc.Mesh(app.graphicsDevice);mesh.setPositions(positions);if(normals)mesh.setNormals(normals);if(colors)mesh.setColors(colors,4);mesh.setIndices(indices);mesh.update(pc.PRIMITIVE_TRIANGLES);const e=new pc.Entity(name);e.addComponent("render",{type:"asset",castShadows:true,receiveShadows:true});e.render.meshInstances=[new pc.MeshInstance(mesh,material)];app.root.addChild(e);return e}
 
 function buildTerrain(){
- for(let cz=0;cz<5;cz++)for(let cx=0;cx<8;cx++){const verts=[],inds=[],normals=[],x0=-80+cx*20,x1=x0+20,z0=-62.5+cz*25,z1=z0+25,gx=5,gz=5;
-  for(let j=0;j<=gz;j++)for(let i=0;i<=gx;i++){const x=x0+(x1-x0)*i/gx,z=z0+(z1-z0)*j/gz,y=height(x,z);verts.push(x,y,z);const e=.35,dx=height(x+e,z)-height(x-e,z),dz=height(x,z+e)-height(x,z-e),nx=-dx,ny=2,nz=-dz,len=Math.hypot(nx,ny,nz);normals.push(nx/len,ny/len,nz/len)}
+ const terrainMats=[snow,snowBlue,snowGrey,snowBright];
+ terrainMats.forEach(m=>{m.diffuseVertexColor=true;m.update()});
+ for(let cz=0;cz<5;cz++)for(let cx=0;cx<8;cx++){
+  const verts=[],inds=[],normals=[],colors=[],x0=-80+cx*20,x1=x0+20,z0=-62.5+cz*25,z1=z0+25,gx=8,gz=8;
+  for(let j=0;j<=gz;j++)for(let i=0;i<=gx;i++){
+   const x=x0+(x1-x0)*i/gx,z=z0+(z1-z0)*j/gz,y=height(x,z);
+   verts.push(x,y,z);
+   const e=.22,dx=height(x+e,z)-height(x-e,z),dz=height(x,z+e)-height(x,z-e),nx=-dx,ny=2,nz=-dz,len=Math.hypot(nx,ny,nz);
+   normals.push(nx/len,ny/len,nz/len);
+   const localNoise=.94+.055*Math.sin(x*.37+z*.19)+.035*Math.cos(z*.51-x*.13);
+   const shade=Math.max(.72,Math.min(1.06,localNoise-(Math.hypot(dx,dz)*.012)));
+   colors.push(shade,Math.min(1,shade+.035),Math.min(1,shade+.07),1);
+  }
   for(let j=0;j<gz;j++)for(let i=0;i<gx;i++){const q=j*(gx+1)+i;inds.push(q,q+1,q+gx+1,q+1,q+gx+2,q+gx+1)}
-  const cxm=(x0+x1)/2,czm=(z0+z1)/2,slope=Math.hypot(height(cxm+.8,czm)-height(cxm-.8,czm),height(cxm,czm+.8)-height(cxm,czm-.8));let material=snow;if(slope>11)material=rock;else if(slope>7)material=snowBlue;else if(czm>30&&height(cxm,czm)>35)material=snowBright;else if(czm<-20)material=snowGrey;meshEntity("Mountain terrain chunk",verts,inds,material,normals)}
- const faces=[[-9,40,14,9,3],[-38,28,13,8,2.1],[21,30,12,8,2.5],[42,20,10,10,2],[-56,17,10,7,1.7],[4,33,9,7,3],[55,7,8,12,1.3]];
- faces.forEach((p,k)=>{const[cx,cz,sx,sz,drop]=p,verts=[],inds=[],n=7;for(let j=0;j<=n;j++)for(let i=0;i<=n;i++){const u=i/n*2-1,v=j/n*2-1,x=cx+u*sx,z=cz+v*sz,y=height(x,z)-drop*(.35+.65*Math.abs(v));verts.push(x,y,z)}for(let j=0;j<n;j++)for(let i=0;i<n;i++){const q=j*(n+1)+i;inds.push(q,q+1,q+n+1,q+1,q+n+2,q+n+1)}meshEntity("Granite cliff "+k,verts,inds,k%3===0?rockDark:rockLight)})
+  const cxm=(x0+x1)/2,czm=(z0+z1)/2,slope=Math.hypot(height(cxm+.8,czm)-height(cxm-.8,czm),height(cxm,czm+.8)-height(cxm,czm-.8));
+  let material=snow;
+  if(slope>11)material=rock;
+  else if(slope>7)material=snowBlue;
+  else if(czm>30&&height(cxm,czm)>35)material=snowBright;
+  else if(czm<-20)material=snowGrey;
+  meshEntity("Mountain terrain chunk",verts,inds,material,normals,colors);
+ }
+ // Layered rock shelves and avalanche gullies make the mountain read as a shaped alpine landform instead of a flat mesh.
+ const faces=[
+  [-9,40,14,9,3],[-38,28,13,8,2.1],[21,30,12,8,2.5],[42,20,10,10,2],
+  [-56,17,10,7,1.7],[4,33,9,7,3],[55,7,8,12,1.3],[-20,19,8,6,1.4],[32,7,7,9,1.8]
+ ];
+ faces.forEach((p,k)=>{
+  const[cx,cz,sx,sz,drop]=p,verts=[],inds=[],n=9;
+  for(let j=0;j<=n;j++)for(let i=0;i<=n;i++){
+   const u=i/n*2-1,v=j/n*2-1,x=cx+u*sx,z=cz+v*sz;
+   const shelf=Math.max(0,1-Math.hypot(u*.92,v)*.9);
+   const y=height(x,z)-drop*(.28+.72*Math.abs(v))-shelf*.35;
+   verts.push(x,y,z);
+  }
+  for(let j=0;j<n;j++)for(let i=0;i<n;i++){const q=j*(n+1)+i;inds.push(q,q+1,q+n+1,q+1,q+n+2,q+n+1)}
+  meshEntity("Granite cliff "+k,verts,inds,k%3===0?rockDark:rockLight);
+ });
+ // Snow pillows/ribs across the upper mountain create visible contouring and wind-loaded faces.
+ const ribs=[
+  [[-55,34],[-38,38],[-20,43],[-3,47]],[[6,43],[22,39],[39,35]],[[35,28],[49,25],[63,19]],
+  [[-60,23],[-45,27],[-29,31]], [[-18,34],[-2,37],[16,34]]
+ ];
+ ribs.forEach((rib,ri)=>{
+  for(let k=0;k<rib.length-1;k++){
+   const a=rib[k],b=rib[k+1],dx=b[0]-a[0],dz=b[1]-a[1],l=Math.hypot(dx,dz)||1,nx=-dz/l,nz=dx/l,w=1.1;
+   const x0=a[0],z0=a[1],x1=b[0],z1=b[1],y0=height(x0,z0)+.16,y1=height(x1,z1)+.16;
+   meshEntity("Wind carved snow rib",[
+    x0+nx*w,y0+.12,z0+nz*w,x0-nx*w,y0,z0-nz*w,
+    x1+nx*w,y1+.12,z1+nz*w,x1-nx*w,y1,z1-nz*w
+   ],[0,1,2,1,3,2],ri%2?snowBright:snowBlue, [0,1,0,0,1,0,0,1,0,0,1,0]);
+  }
+ });
 }
 
-function distantRange(baseZ,scale,seed){const verts=[],inds=[],n=18;for(let i=0;i<=n;i++){const x=-130+i*(260/n),peak=18+10*Math.sin(i*1.7+seed)+7*Math.cos(i*.73+seed),z=baseZ+4*Math.sin(i*.8+seed);verts.push(x,peak,z,x+7,4,z+8,x-7,4,z+8)}for(let i=0;i<n;i++){const q=i*3;inds.push(q,q+1,q+3,q+3,q+1,q+4,q+2,q+5,q+3,q+2,q+3,q)}meshEntity("Distant alpine range",verts,inds,rockLight);for(let i=0;i<n;i+=2){const x=-130+i*(260/n),peak=18+10*Math.sin(i*1.7+seed)+7*Math.cos(i*.73+seed),c=new pc.Entity("Distant snow peak");c.setLocalPosition(x,peak+.15,baseZ-.5);app.root.addChild(c);cone("snow peak",[5*scale,Math.max(7,12*scale),5*scale],[0,0,0],snowBright,c)}}
+function distantRange(baseZ,scale,seed){const verts=[],inds=[],n=18;for(let i=0;i<=n;i++){const x=-130+i*(260/n),peak=18+10*Math.sin(i*1.7+seed)+7*Math.cos(i*.73+seed),z=baseZ+4*Math.sin(i*.8+seed);verts.push(x,peak,z,x+7,4,z+8,x-7,4,z+8)}for(let i=0;i<n;i++){const q=i*3;inds.push(q,q+1,q+3,q+3,q+1,q+4,q+2,q+5,q+3,q+2,q+3,q)}meshEntity("Distant alpine range",verts,inds,rockLight);for(let i=0;i<n;i+=3){const x=-130+i*(260/n),peak=18+10*Math.sin(i*1.7+seed)+7*Math.cos(i*.73+seed),c=new pc.Entity("Distant snow peak");c.setLocalPosition(x,peak+.15,baseZ-.5);app.root.addChild(c);cone("snow peak",[5*scale,Math.max(7,12*scale),5*scale],[0,0,0],snowBright,c)}}
 distantRange(-82,1.15,.4);distantRange(-112,.95,1.9);distantRange(-142,.78,3.2);buildTerrain();
 
 function tree(x,z,s=1,snowLoad=.45){const y=height(x,z),e=new pc.Entity("Alpine fir");e.setLocalPosition(x,y-.05,z);app.root.addChild(e);cyl("trunk",[.22*s,.9*s,.22*s],[0,.45*s,0],trunk,e);cone("lower boughs",[1.3*s,2.25*s,1.3*s],[0,1.35*s,0],pine,e);cone("middle boughs",[1.05*s,1.9*s,1.05*s],[0,2.35*s,0],pine,e);cone("top boughs",[.72*s,1.6*s,.72*s],[0,3.05*s,0],pine2,e);if(snowLoad>.65)cone("snow crown",[.48*s,.7*s,.48*s],[0,3.55*s,0],pineSnow,e)}
-for(let i=0;i<95;i++){const x=-77+Math.random()*154,z=-58+Math.random()*108,y=height(x,z);if(y>5&&y<32&&Math.random()>.08)tree(x,z,.45+Math.random()*.9,.45+Math.random()*.6)}
+for(let i=0;i<78;i++){const x=-77+Math.random()*154,z=-58+Math.random()*108,y=height(x,z);if(y>5&&y<32&&Math.random()>.08)tree(x,z,.45+Math.random()*.9,.45+Math.random()*.6)}
 paths.forEach(path=>{path.pts.forEach(([x,z],i)=>{const prev=path.pts[Math.max(0,i-1)],next=path.pts[Math.min(path.pts.length-1,i+1)],dx=next[0]-prev[0],dz=next[1]-prev[1],l=Math.hypot(dx,dz)||1,nx=-dz/l,nz=dx/l;for(const side of[-1,1]){const px=x+nx*(path.width*.55)*side,pz=z+nz*(path.width*.55)*side;cone(path.name+" snowbank",[.34,.65,.34],[px,height(px,pz)+.32,pz],snowBright)}})});
 
 function ribbon(path){const verts=[],inds=[],normals=[];for(let i=0;i<path.pts.length;i++){const[x,z]=path.pts[i],prev=path.pts[Math.max(0,i-1)],next=path.pts[Math.min(path.pts.length-1,i+1)],dx=next[0]-prev[0],dz=next[1]-prev[1],l=Math.hypot(dx,dz)||1,nx=-dz/l,nz=dx/l,w=path.width/2,left=[x+nx*w,z+nz*w],right=[x-nx*w,z-nz*w];verts.push(left[0],height(left[0],left[1])+.18,left[1],right[0],height(right[0],right[1])+.18,right[1]);normals.push(0,1,0,0,1,0)}for(let i=0;i<path.pts.length-1;i++){const q=i*2;inds.push(q,q+1,q+2,q+1,q+3,q+2)}meshEntity(path.name+" groomed piste",verts,inds,path.color,normals);path.pts.forEach(([x,z],i)=>{if(i%2===0){const dx=path.pts[Math.min(path.pts.length-1,i+1)][0]-path.pts[Math.max(0,i-1)][0],dz=path.pts[Math.min(path.pts.length-1,i+1)][1]-path.pts[Math.max(0,i-1)][1],l=Math.hypot(dx,dz)||1,nx=-dz/l,nz=dx/l;for(const s of[-1,1]){const px=x+nx*(path.width*.64)*s,pz=z+nz*(path.width*.64)*s;cyl(path.name+" marker pole",[.045,1.25,.045],[px,height(px,pz)+.62,pz],yellow)}}})}
@@ -56,7 +103,34 @@ function makeLift(n,a,b,count,type="chair"){const root=new pc.Entity(n);app.root
 const lift1=makeLift("Eagle Express",[-5,-22],[-39,33],12,"chair"),lift2=makeLift("Glacier Chair",[18,-15],[0,40],11,"chair"),lift3=makeLift("Ridge Gondola",[29,-8],[45,30],9,"gondola");
 
 const guests=[];function samplePath(path,t){const f=t*(path.pts.length-1),i=Math.min(path.pts.length-2,Math.floor(f)),q=f-i;return[path.pts[i][0]+(path.pts[i+1][0]-path.pts[i][0])*q,path.pts[i][1]+(path.pts[i+1][1]-path.pts[i][1])*q]}
-function makeSkier(i,route,t,type){const p=samplePath(paths[route],t),y=height(p[0],p[1])+.66,e=new pc.Entity((type==="snowboarder"?"Snowboarder ":"Skier ")+i);e.setLocalPosition(p[0],y,p[1]);app.root.addChild(e);const jm=[jacket,jacket2,jacket3,jacket4][i%4];sphere("helmet",[.27,.27,.27],[0,1.58,0],i%2?cable:yellow,e);sphere("head",[.22,.22,.22],[0,1.38,0],skin,e);box("torso",[.42,.68,.30],[0,.95,0],jm,e);box("arm",[.13,.55,.13],[-.30,1.02,0],jm,e);box("arm",[.13,.55,.13],[.30,1.02,0],jm,e);box("leg",[.14,.55,.14],[-.13,.42,0],pants,e);box("leg",[.14,.55,.14],[.13,.42,0],pants,e);if(type==="snowboarder")box("board",[.95,.07,.20],[0,.13,0],board,e);else{box("ski",[.055,.045,1.12],[-.18,.12,0],snowBright,e);box("ski",[.055,.045,1.12],[.18,.12,0],snowBright,e);cyl("pole",[.025,.7,.025],[-.34,.62,0],steel,e);cyl("pole",[.025,.7,.025],[.34,.62,0],steel,e)}e._route=route;e._path=t;e._speed=.022+Math.random()*.04;e._phase=Math.random()*6;guests.push(e)}
+function makeSkier(i,route,t,type){
+ const p=samplePath(paths[route],t),y=height(p[0],p[1])+.04,e=new pc.Entity((type==="snowboarder"?"Snowboarder ":"Skier ")+i);
+ e.setLocalPosition(p[0],y,p[1]);e.setLocalScale(1.18,1.18,1.18);app.root.addChild(e);
+ const jm=[jacket,jacket2,jacket3,jacket4][i%4], visor=i%3===0?goggle:cable;
+ // A crouched silhouette: helmet, goggles, hood, padded jacket, backpack, bent arms, gloves, legs and boots.
+ capsule("body", [.42,.62,.32],[0,1.02,0], jm,e);
+ sphere("head",[.38,.38,.38],[0,1.53,.01],skin,e);
+ sphere("helmet",[.43,.24,.43],[0,1.72,.01],i%2?cable:yellow,e);
+ box("goggles",[.29,.095,.055],[0,1.57,.20],visor,e);
+ box("jacket collar",[.34,.18,.34],[0,1.36,.02],jm,e);
+ box("backpack",[.28,.42,.16],[0,1.10,-.19],pack,e);
+ // Arms are angled forward like a real skier rather than hanging straight down.
+ const a1=capsule("arm",[.12,.42,.12],[-.33,1.18,.08],jm,e);a1.setLocalEulerAngles(0,0,-30);
+ const a2=capsule("arm",[.12,.42,.12],[.33,1.18,.08],jm,e);a2.setLocalEulerAngles(0,0,30);
+ sphere("glove",[.14,.14,.14],[-.48,1.36,.18],glove,e);sphere("glove",[.14,.14,.14],[.48,1.36,.18],glove,e);
+ const l1=capsule("leg",[.14,.48,.14],[-.14,.52,.03],pants,e);l1.setLocalEulerAngles(0,0,-9);
+ const l2=capsule("leg",[.14,.48,.14],[.14,.52,.03],pants,e);l2.setLocalEulerAngles(0,0,9);
+ box("boot", [.20,.20,.36],[-.14,.26,.12],boot,e);box("boot", [.20,.20,.36],[.14,.26,.12],boot,e);
+ if(type==="snowboarder"){
+   box("snowboard",[1.12,.075,.20],[0,.12,.02],board,e);
+   sphere("binding",[.13,.09,.16],[-.25,.17,.02],steel,e);sphere("binding",[.13,.09,.16],[.25,.17,.02],steel,e);
+ }else{
+   box("ski",[.055,.045,1.45],[-.18,.13,.12],snowBright,e);box("ski",[.055,.045,1.45],[.18,.13,.12],snowBright,e);
+   const p1=cyl("pole",[.028,.82,.028],[-.38,.68,.20],steel,e);p1.setLocalEulerAngles(12,0,-18);
+   const p2=cyl("pole",[.028,.82,.028],[.38,.68,.20],steel,e);p2.setLocalEulerAngles(12,0,18);
+ }
+ e._route=route;e._path=t;e._speed=.022+Math.random()*.04;e._phase=Math.random()*6;guests.push(e)
+}
 for(let i=0;i<44;i++)makeSkier(i,i%paths.length,(i*.173+Math.random()*.22)%1,i%7===0?"snowboarder":"skier");
 function chooseRoute(g){const choices=[0,1,2,3,4].filter(x=>x!==g._route);g._route=choices[Math.floor(Math.random()*choices.length)];g._path=Math.random()*.12;g._speed=.022+Math.random()*.04}
 let cash=250000,paused=false,weather=0;
@@ -69,7 +143,7 @@ document.getElementById("weatherBtn").onclick=()=>{weather=(weather+1)%3;const n
 document.getElementById("resetBtn").onclick=()=>{cash=250000;toast("New season started")};
 
 const camera=new pc.Entity("Camera");camera.addComponent("camera",{clearColor:new pc.Color(.63,.77,.88),fov:46});app.root.addChild(camera);
-let yaw=-31,pitch=31,distance=132,target=new pc.Vec3(0,17,5);
+let yaw=-31,pitch=32,distance=112,target=new pc.Vec3(0,19,4);
 function updateCamera(){const yr=yaw*Math.PI/180,pr=pitch*Math.PI/180;camera.setPosition(target.x+Math.sin(yr)*Math.cos(pr)*distance,target.y+Math.sin(pr)*distance,target.z+Math.cos(yr)*Math.cos(pr)*distance);camera.lookAt(target)}
 updateCamera();
 const pointers=new Map();let lastDist=0;
