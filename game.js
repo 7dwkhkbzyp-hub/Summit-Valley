@@ -737,6 +737,38 @@ canvas.addEventListener("wheel",e=>{distance=Math.max(48,Math.min(160,distance+e
 const visualRoot=new pc.Entity("VISUAL OVERHAUL");
 app.root.addChild(visualRoot);
 
+/* Strong alpine skyline: faceted mountain masses behind the playable terrain.
+   These are custom meshes, not cones, so the mountain silhouette reads clearly
+   from the management camera. */
+function alpinePeak(name,cx,cz,w,h,material,rot=0){
+ const cr=Math.cos(rot),sr=Math.sin(rot);
+ const base=[
+  [-.50,-.40],[-.16,-.50],[.25,-.43],[.50,-.08],
+  [.38,.38],[0,.48],[-.40,.34],[-.55,.02]
+ ];
+ const verts=[];
+ base.forEach(([u,v])=>{
+   const x=cx+(u*w)*cr-(v*w*.72)*sr;
+   const z=cz+(u*w)*sr+(v*w*.72)*cr;
+   verts.push(x,3,z);
+ });
+ // broad shoulder points and summit ridge
+ verts.push(cx-w*.13,3+h,cz-w*.03);
+ verts.push(cx+w*.18,3+h*.72,cz+w*.05);
+ const inds=[];
+ for(let i=0;i<8;i++){const j=(i+1)%8;inds.push(i,j,8);}
+ inds.push(0,7,6,0,6,1,1,6,5,1,5,2,2,5,4,2,4,3);
+ const e=visualMesh(name,verts,inds,material);e.setEulerAngles(0,rot*180/Math.PI,0);
+ return e;
+}
+alpinePeak("Grand Alpine Mass 01",-55,67,42,55,rockDark,.04);
+alpinePeak("Grand Alpine Mass 02",-10,73,48,67,rock,.12);
+alpinePeak("Grand Alpine Mass 03",38,68,43,58,rockDark,-.08);
+alpinePeak("Grand Alpine Snow Crown 01",-55,67,35,46,snowBright,.04);
+alpinePeak("Grand Alpine Snow Crown 02",-10,73,40,57,snowBright,.12);
+alpinePeak("Grand Alpine Snow Crown 03",38,68,35,48,snowBright,-.08);
+
+
 function visualMesh(name, positions, indices, material){
  const mesh=new pc.Mesh(app.graphicsDevice);
  mesh.setPositions(positions); mesh.setIndices(indices); mesh.update(pc.PRIMITIVE_TRIANGLES);
@@ -883,10 +915,10 @@ try{
 }catch(_){}
 
 /* More cinematic atmospheric depth without requiring a heavy post-process pass. */
-app.scene.fog.start=82;
-app.scene.fog.end=235;
+app.scene.fog.start=105;
+app.scene.fog.end=285;
 app.scene.fog.color=new pc.Color(.60,.73,.86);
-app.scene.exposure=1.18;
+app.scene.exposure=1.08;
 
 /* Animate clouds and let the mountain breathe visually through drifting snow. */
 app.on("update",dt=>{
