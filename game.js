@@ -265,7 +265,7 @@ document.querySelectorAll("[data-menu]").forEach(b=>b.addEventListener("click",(
 function toast(t){const e=document.getElementById("toast");e.textContent=t;e.classList.add("show");clearTimeout(window.__toast);window.__toast=setTimeout(()=>e.classList.remove("show"),1600)}
 document.getElementById("pauseBtn").onclick=()=>{paused=!paused;document.getElementById("pauseBtn").textContent=paused?"▶":"Ⅱ";toast(paused?"Game paused":"Game resumed")};
 document.getElementById("weatherBtn").onclick=()=>{weather=(weather+1)%3;const n=["Clear","Snowfall","Storm"];document.getElementById("weather").textContent=n[weather];toast(n[weather]+" conditions")};
-document.getElementById("resetBtn").onclick=()=>{cash=250000;placedBuildings.splice(0).forEach(()=>{});localStorage.removeItem("summit-valley-save");toast("New season started")};
+document.getElementById("resetBtn").onclick=()=>{placedBuildings.forEach(b=>b.entity&&b.entity.destroy());placedBuildings.length=0;cash=250000;localStorage.removeItem("summit-valley-save");toast("New season started")};
 window.addEventListener("beforeunload",saveGame);
 
 const camera=new pc.Entity("Camera");camera.addComponent("camera",{clearColor:new pc.Color(.63,.77,.88),fov:46});app.root.addChild(camera);
