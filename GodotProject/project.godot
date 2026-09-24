@@ -14,9 +14,3 @@ window/stretch/mode="canvas_items"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 environment/defaults/default_clear_color=Color(0.08, 0.12, 0.18, 1)
-
-[input]
-build_mode={"deadzone":0.5,"events":[Object(InputEventKey,"physical_keycode":66)]}
-piste_mode={"deadzone":0.5,"events":[Object(InputEventKey,"physical_keycode":80)]}
-lift_mode={"deadzone":0.5,"events":[Object(InputEventKey,"physical_keycode":76)]}
-pause_game={"deadzone":0.5,"events":[Object(InputEventKey,"physical_keycode":32)]}
